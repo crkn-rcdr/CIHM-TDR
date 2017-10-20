@@ -2,7 +2,6 @@ package CIHM::TDR::SIP;
 use strict;
 use warnings;
 
-use CIHM::Bagit;
 use File::Basename;
 use File::Glob;
 use List::Util;
@@ -13,6 +12,7 @@ use File::Temp qw/ tempfile tempdir /;
 use File::Spec;
 use Cwd;
 use Try::Tiny;
+use Archive::BagIt::Fast;
 
 =head1 NAME
 
@@ -59,9 +59,14 @@ sub validate {
         $mytemp = File::Spec->tmpdir;
     }
 
-    # Validate bagit archive
-    die("Bagit version is not 0.97\n") unless (CIHM::Bagit::version($self->{root}) eq '0.97');
-    die("Bagit Archive didn't verify\n") unless (CIHM::Bagit::verify_md5($self->{root}));
+    try {
+        my $bagit = new Archive::BagIt::Fast($self->{root});
+        die("Bagit version is not 0.97\n") unless $bagit->version() == 0.97;
+        my $valid = $bagit->verify_bag();
+    }
+    catch {
+        die "invalid SIP @ ".$self->{root}.": $_\n";
+    };
 
     # Validate the core METS document against the METS schema.
     my $mets_schema;
