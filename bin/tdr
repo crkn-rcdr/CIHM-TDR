@@ -1,0 +1,13 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use lib "/opt/c7a-perl/current/cmd/local/lib/perl5";
+use FindBin;
+use lib "$FindBin::RealBin/../lib";
+use CIHM::TDR::App;
+
+CIHM::TDR::App->new_with_command->run;
+
+1;
