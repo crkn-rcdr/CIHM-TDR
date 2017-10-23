@@ -1,0 +1,19 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use lib "/opt/c7a-perl/current/cmd/local/lib/perl5";
+use FindBin;
+use lib "$FindBin::RealBin/../../lib";
+
+# Remember to use `SKIP_SYS_RUNALONE=1 /opt/tdr/current/etc/cron/tdr-replicate` to skip this test...
+use Sys::RunAlone silent => 1;
+use CIHM::TDR::Replication;
+
+CIHM::TDR::Replication->new({ 
+    configpath => "/etc/canadiana/tdr/tdr.conf"
+                            })->replicate;
+
+1;
+__END__

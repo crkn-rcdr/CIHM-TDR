@@ -1,0 +1,21 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+
+use lib "/opt/c7a-perl/current/cmd/local/lib/perl5";
+use FindBin;
+use lib "$FindBin::RealBin/../../lib";
+
+use Sys::RunAlone silent => 1;
+use Sys::Hostname;
+use CIHM::TDR::Replication;
+
+CIHM::TDR::Replication->new({ 
+    since => "48hours",
+#    localdocument => "replicationwork.".hostname,
+    configpath => "/etc/canadiana/tdr/tdr.conf"
+                            })->replicationwork;
+
+1;
+__END__
