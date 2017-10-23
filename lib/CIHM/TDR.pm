@@ -12,6 +12,7 @@ use File::Path qw(make_path remove_tree);
 use POSIX qw(strftime);
 use String::CRC32;
 use XML::LibXML;
+use Archive::BagIt;
 
 =head1 NAME
 
@@ -91,7 +92,7 @@ sub ingest {
     }
 
     # Generate BagIt information files for the AIP
-    $self->write_bagit($aip_incoming);
+    Archive::BagIt->make_bag($aip_incoming);
     
     # Move the new or updated AIP into place
     $t_repo->aip_delete($contributor,$id) or die("Failed to move $aip to $aip_trashcan: $!");
@@ -110,10 +111,10 @@ sub ingest_check {
     # Look up to determine if this is an update of existing AIP
     my $aip = $self->repo->find_aip_pool($contributor, $identifier);
     if ($aip && !$update) {
-        die("AIP exists but --update not requested: $aip");
+        die("AIP exists but --update not requested: $aip\n");
     }
     if (!$aip && $update) {
-        die("--update requested, but AIP missing from local repository for ". $contributor. ".". $identifier);
+        die("--update requested, but AIP missing from local repository for ". $contributor. ".". $identifier."\n");
     }
 
     # Additional checks if "tdrepo" database configured
@@ -152,7 +153,7 @@ sub ingest_check {
             if (substr($line,-12) eq 'metadata.xml') {
                 my ($md5,$filename)=split /\s+/, $line;
                 if($md5 eq $metadatamd5) {
-                    die("metadata.xml from SIP matches existing AIP: $aip/$filename");
+                    die("metadata.xml from SIP matches existing AIP: $aip/$filename\n");
                 }
             }
         }
@@ -197,8 +198,7 @@ sub update_metadata {
         die("Failed to copy $aip_incoming/data/sip/manifest-md5.txt to $aip_incoming/data/revisions/$revision_name/manifest-md5.txt: $!");
 
     # Update the SIP bagit info
-    CIHM::Bagit::write_bagit("$aip_incoming/data/sip");
-    CIHM::Bagit::manifest_md5("$aip_incoming/data/sip");
+    Archive::BagIt->make_bag("$aip_incoming/data/sip");
 
     # Create the new SIP
     my $revision = CIHM::TDR::SIP->new("$aip_incoming/data/sip");
@@ -209,7 +209,7 @@ sub update_metadata {
     $self->changelog($aip_incoming, "Updated metadata record. Reason: $reason");
 
     # Generate BagIt information files for the AIP
-    $self->write_bagit($aip_incoming);
+    Archive::BagIt->make_bag($aip_incoming);
     
     # Move the new or updated AIP into place
     $t_repo->aip_delete($contributor,$identifier) or die("Failed to move $aip to $aip_trashcan: $!");
@@ -299,26 +299,12 @@ sub delete {
     $self->changelog($aip_incoming, "Deleted SIP and all revisions from archive. Reason: $reason");
 
     # Generate BagIt information files for the AIP
-    $self->write_bagit($aip_incoming);
+    Archive::BagIt->make_bag($aip_incoming);
     
     # Move the new or updated AIP into place
     $t_repo->aip_delete($contributor,$identifier) or die("Failed to move $aip to $aip_trashcan: $!");
     $t_repo->aip_add($contributor,$identifier) or die("Failed to add $aip_incoming to repository: $!");
     return 1;
-}
-
-sub write_bagit {
-    my($self, $root) = @_;
-    CIHM::Bagit::write_bagit($root);
-    CIHM::Bagit::write_baginfo($root,
-        "Source-Organization" => "Canadiana.org",
-        "Organization-Address" => "440 Laurier Ave West Suite 220 Ottawa ON Canada K1R 7X6",
-        "Contact-Email" => "info\@canadiana.ca",
-        "External-Identifier" => sprintf("%s.%s", $self->contributor($root), $self->identifier($root)),
-        "External-Description" => "Archival information package (AIP) from the Canadiana.org Trustworthy Digital Repository",
-    );
-    CIHM::Bagit::manifest_crc32($root);
-    CIHM::Bagit::manifest_md5($root);
 }
 
 # Append a changelog record
