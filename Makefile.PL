@@ -10,6 +10,9 @@ WriteMakefile(
     ABSTRACT_FROM    => 'lib/CIHM/TDR.pm',
     LICENSE          => 'Artistic_2_0',
     PL_FILES         => {},
+    "EXE_FILES" => [
+      "bin/tdr", "bin/tdr-replicate", "bin/tdr-replicationwork"
+    ],
     MIN_PERL_VERSION => 5.006,
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
