@@ -5,7 +5,7 @@ use feature "switch";
 use Data::Dumper;
 use Storable qw(freeze thaw);
 use MooseX::App::Command;
-use CIHM::Worker::BagIt;
+use CIHM::TDR::VerifyWorker;
 use DateTime;
 
 extends qw(CIHM::TDR::App);
@@ -83,9 +83,9 @@ sub run {
   $self->log->info("Running tdr verify at: $start_time");
   my $pool = AnyEvent::Fork
       ->new
-      ->require ("CIHM::Worker::BagIt")
+      ->require ("CIHM::TDR::VerifyWorker")
       ->AnyEvent::Fork::Pool::run (
-        "CIHM::Worker::BagIt::bag_verify",
+        "CIHM::TDR::VerifyWorker::bag_verify",
         "max"        => $self->maxprocs,
         "load"       => $self->workqueue,
         "on_destroy" => ( my $cv_finish = AE::cv ),
