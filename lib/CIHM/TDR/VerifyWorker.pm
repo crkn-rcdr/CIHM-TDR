@@ -1,4 +1,4 @@
-package CIHM::Worker::BagIt;
+package CIHM::TDR::VerifyWorker;
 
 use strict;
 use AnyEvent;
