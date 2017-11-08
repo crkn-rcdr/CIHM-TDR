@@ -61,6 +61,7 @@ sub run {
   use CIHM::TDR::TDRConfig;
   use CIHM::TDR::Repository;
   use Coro::Semaphore;
+  use AnyEvent::Fork;
   use AnyEvent::Fork::Pool;
 
   my $t_repo = CIHM::TDR::Repository->new($self->conf);
