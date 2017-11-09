@@ -2,18 +2,21 @@
 
 use strict;
 use warnings;
-
-use lib "/opt/c7a-perl/current/cmd/local/lib/perl5";
 use FindBin;
 use lib "$FindBin::RealBin/../../lib";
-
-# Remember to use `SKIP_SYS_RUNALONE=1 /opt/tdr/current/etc/cron/tdr-replicate` to skip this test...
-use Sys::RunAlone silent => 1;
 use CIHM::TDR::Replication;
+
+use Fcntl qw(:DEFAULT :flock);
+my $lockfile = '/var/lock/tdr/tdr-replicate';
+
+# Only allow one instance to run at a time..
+sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
+  or die "can't open lockfile=$lockfile: $!\n";
+flock(FH, LOCK_EX | LOCK_NB)
+  or exit 0;
 
 CIHM::TDR::Replication->new({ 
     configpath => "/etc/canadiana/tdr/tdr.conf"
                             })->replicate;
 
 1;
-__END__

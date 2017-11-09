@@ -2,14 +2,19 @@
 
 use strict;
 use warnings;
-
-use lib "/opt/c7a-perl/current/cmd/local/lib/perl5";
 use FindBin;
 use lib "$FindBin::RealBin/../../lib";
-
-use Sys::RunAlone silent => 1;
 use Sys::Hostname;
 use CIHM::TDR::Replication;
+
+use Fcntl qw(:DEFAULT :flock);
+my $lockfile = '/var/lock/tdr/tdr-replicationwork';
+
+# Only allow one instance to run at a time..
+sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
+  or die "can't open lockfile=$lockfile: $!\n";
+flock(FH, LOCK_EX | LOCK_NB)
+  or exit 0;
 
 CIHM::TDR::Replication->new({ 
     since => "48hours",
@@ -18,4 +23,3 @@ CIHM::TDR::Replication->new({
                             })->replicationwork;
 
 1;
-__END__
