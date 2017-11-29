@@ -1,14 +1,12 @@
 package CIHM::TDR::REST::ContentServer;
 
-use Data::Dumper;
 use DateTime;
 use Crypt::JWT;
 
 use Moose;
 with 'Role::REST::Client';
 use Types::Standard qw(HashRef Str Int Enum HasMethods);
-
-use CIHM::TDR::TDRConfig;
+use Config::General;
 
 # Build our own user agent, which will add the header.
 sub _build_user_agent {
@@ -24,8 +22,11 @@ sub BUILD {
 
     $self->{LocalTZ} = DateTime::TimeZone->new( name => 'local' );
     $self->{conf} = $args->{conf};
-    my $t_config = CIHM::TDR::TDRConfig->instance($self->{conf});
-    my %tdrconfig = %{$t_config->get_conf()};
+
+    my $config = new Config::General(
+        -ConfigFile => $self->{conf}
+        );
+    my %tdrconfig = $config->getall();
 
     if (exists $tdrconfig{content}) {
         if (! $self->server && defined $tdrconfig{content}{url}) {
@@ -59,3 +60,5 @@ sub get_clientattrs {
 
     return $self->{clientattrs};
 }
+
+1;

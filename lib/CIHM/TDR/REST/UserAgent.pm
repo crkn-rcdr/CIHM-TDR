@@ -9,6 +9,7 @@ use URI;
 use URI::Escape;
 use DateTime;
 use Crypt::JWT qw(encode_jwt);
+use JSON;
 
 our $VERSION = '0.03';
 
@@ -20,7 +21,15 @@ sub new {
 	$self->{c7a_id} = $args{c7a_id} || '';
 	$self->{jwt_secret} = $args{jwt_secret} || '';
         $self->{jwt_algorithm} = $args{jwt_algorithm} || 'HS256';
-        $self->{jwt_payload} = $args{jwt_payload} || {};
+        my $payload = $args{jwt_payload} || {};
+
+        if(ref($payload) =~ /^(HASH|ARRAY)$/) {
+            $self->{jwt_payload}=$payload;
+        } else {
+            $self->{jwt_payload}=decode_json($payload);
+        }
+        # Set iss
+        $self->{jwt_payload}->{iss}=$self->{c7a_id};
 
 	return bless $self, $class;
 }
@@ -54,8 +63,7 @@ sub _add_c7a_headers {
                                    key=>$self->{jwt_secret});
 
 	$request->{headers}{'Authorization'} = 
-            "C7A2 Key=". encode_param($self->{c7a_id}) . 
-            ",Token=".encode_param($jws_token);
+            "C7A2 ".encode_param($jws_token);
 	return;
 }
 

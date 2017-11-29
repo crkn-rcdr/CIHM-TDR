@@ -31,11 +31,11 @@ CIHM::TDR - Trustworthy Digital Repository management tools
 
 =head1 VERSION
 
-Version 0.05
+Version 0.08
 
 =cut
 
-our $VERSION = '0.05';
+our $VERSION = '0.08';
 
 
 sub new {

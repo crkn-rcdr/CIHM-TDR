@@ -79,6 +79,7 @@ sub run {
     my ($self) = @_;
 
     my %cosargs = (
+        conf => $self->conf,
         c7a_id => $self->key,
         jwt_secret => $self->password,
         jwt_algorithm => $self->algorithm,

@@ -7,7 +7,6 @@ use DateTime;
 use DateTime::Format::MySQL;
 use CIHM::TDR::TDRConfig;
 use CIHM::TDR::Repository;
-use CIHM::TDR::ContentServer;
 use CIHM::TDR::Replication;
 use Try::Tiny;
 use Archive::BagIt::Fast;
