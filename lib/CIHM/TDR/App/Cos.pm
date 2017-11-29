@@ -104,7 +104,7 @@ sub run {
                 say STDERR "Missing destingation filename for copy";
                 exit 1;
             }
-            my $r = $COS_REST->get("/$file", {file => $file});
+            my $r = $COS_REST->get("/$file");
             if ($r->code == 200) {
                 my $fh;
                 if ($tofile eq "-") {
