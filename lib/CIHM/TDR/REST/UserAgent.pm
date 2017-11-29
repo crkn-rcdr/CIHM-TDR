@@ -11,7 +11,7 @@ use DateTime;
 use Crypt::JWT qw(encode_jwt);
 use JSON;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 sub new {
 	my ($class, %args) = @_;
