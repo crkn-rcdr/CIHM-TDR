@@ -8,7 +8,7 @@ WriteMakefile(
     AUTHOR           => q{Russell McOrmond <russell.mcormond@canadiana.ca>},
     VERSION_FROM     => 'lib/CIHM/TDR.pm',
     ABSTRACT_FROM    => 'lib/CIHM/TDR.pm',
-    LICENSE          => 'Artistic_2_0',
+    LICENSE          => 'Artistic_2',
     PL_FILES         => {},
     "EXE_FILES" => [
       "bin/tdr", "bin/tdr-replicate", "bin/tdr-replicationwork"

@@ -2,7 +2,6 @@ bin/tdr
 bin/tdr-replicate
 bin/tdr-replicationwork
 Changes
-ignore.txt
 lib/CIHM/TDR.pm
 lib/CIHM/TDR/App.pm
 lib/CIHM/TDR/App/Add.pm

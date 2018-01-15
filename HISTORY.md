@@ -1,10 +1,10 @@
-# CIHM::Meta module history
+# CIHM::TDR module history
 
 ## Short version
 
 The git log suggests this code was created on November 22, 2017, and that it was created by Russell McOrmond.
 
-This was the date that code was refactored while it was in our Subversion repository, and included many 'svn mv' commands from across our repository to land in CIHM-META/trunk .
+This was the date that code was refactored while it was in our Subversion repository, and included many 'svn mv' commands from across our repository to land in CIHM-TDR/trunk .
 
 When we tried to use `git svn` to move to Git to publish on Github, we lost the history prior to moving into the new project. We tried many different ways to extract the history, including a perl script to filter the output of `svnadmin dump` , but the problem turned out to be too messy.  We decided to leave that history in the Subversion repository, and create this note to reference the issue.
 
