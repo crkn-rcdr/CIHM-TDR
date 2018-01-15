@@ -1,15 +1,16 @@
 CIHM-TDR
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+This is a module used by Canadiana to handle much of the lower-level
+manipulation of the repository.
 
-A README file is required for CPAN modules since CPAN extracts the README
-file from a module distribution so that people browsing the archive
-can use it to get an idea of the module's uses. It is usually a good idea
-to provide version information here so that people can decide whether
-fixes for the module are worth downloading.
+Tools in bin/ include:
+
+tdr - command-line interface to manipulate repository.
+
+tdr-replicate - tool run from cron which handles AIP replication.
+
+tdr-replicationwork - tool run from cron which determines which AIPS
+                      require replication.
 
 
 INSTALLATION
@@ -21,31 +22,26 @@ To install this module, run the following commands:
 	make test
 	make install
 
+
+We use this module from the following Docker images:
+
+https://github.com/c7a/cihm-repomanage
+https://github.com/c7a/cihm-metadatabus
+https://github.com/c7a/cihm-ingestwip
+
+
 SUPPORT AND DOCUMENTATION
 
-After installing, you can find documentation for this module with the
-perldoc command.
+  https://github.com/c7a/CIHM-TDR has an issue tracker which should be
+  used for any questions.
 
-    perldoc CIHM::TDR
-
-You can also look for information at:
-
-    RT, CPAN's request tracker (report bugs here)
-        http://rt.cpan.org/NoAuth/Bugs.html?Dist=CIHM-TDR
-
-    AnnoCPAN, Annotated CPAN documentation
-        http://annocpan.org/dist/CIHM-TDR
-
-    CPAN Ratings
-        http://cpanratings.perl.org/d/CIHM-TDR
-
-    Search CPAN
-        http://search.cpan.org/dist/CIHM-TDR/
+  https://github.com/c7a/CIHM-TDR/blob/master/HISTORY.md contains
+  a note about the history of this module.
 
 
 LICENSE AND COPYRIGHT
 
-Copyright (C) 2017 Russell McOrmond
+Copyright (C) Russell McOrmond, Robert Schmidt, William Wueppelmann
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the the Artistic License (2.0). You may obtain a
