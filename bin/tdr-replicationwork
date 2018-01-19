@@ -5,6 +5,7 @@ use warnings;
 use FindBin;
 use lib "$FindBin::RealBin/../../lib";
 use Sys::Hostname;
+use Getopt::Long;
 use CIHM::TDR::Replication;
 
 use Fcntl qw(:DEFAULT :flock);
@@ -16,10 +17,26 @@ sysopen(FH, $lockfile, O_WRONLY | O_CREAT)
 flock(FH, LOCK_EX | LOCK_NB)
   or exit 0;
 
-CIHM::TDR::Replication->new({ 
-    since => "48hours",
-#    localdocument => "replicationwork.".hostname,
-    configpath => "/etc/canadiana/tdr/tdr.conf"
-                            })->replicationwork;
+my $conf = "/etc/canadiana/tdr/tdr.conf";
+my $localdocument;
+my $since="48hours";
+
+GetOptions (
+    'conf:s' => \$conf,
+    'localdocument:s' => \$localdocument,
+    'since:s' => \$since
+    );
+
+my $config= {
+    configpath => $conf
+};
+if ($since ne 'never') {
+    $config->{since}=$since
+}
+if ($localdocument) {
+    $config->{localdocument}=$localdocument;
+}
+
+CIHM::TDR::Replication->new($config)->replicationwork;
 
 1;
