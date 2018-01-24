@@ -113,6 +113,12 @@ sub replicate {
     }
     
     $self->log->info("Replicate");
+
+    my $incoming=$self->incoming;
+    if ($incoming) {
+        $self->scan_incoming($incoming);
+    }
+
     # One by one, sorted by priority, get the AIPs we should replicate
     my @replicateaips;
     while ( (@replicateaips=$self->tdrepo->get_replicate({ limit => 1}))
@@ -120,10 +126,6 @@ sub replicate {
 	$self->replicateaip(pop @replicateaips);
     }
 
-    my $incoming=$self->incoming;
-    if ($incoming) {
-        $self->scan_incoming($incoming);
-    }
 }
 
 sub scan_incoming {
