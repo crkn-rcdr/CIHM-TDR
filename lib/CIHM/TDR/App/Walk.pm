@@ -162,11 +162,8 @@ sub found_aip {
         my $updatedoc=$t_repo->get_manifestinfo($aippath,{ pool => $poolname });
 
         $self->{aip_count}++;
-        if (exists $self->{aiplist}->{$aipid}) {
-            if (! exists $self->{aiplist}->{$aipid}->{'manifest md5'}) {
-                # Initialize variable -- will be noticed as mismatch, but without PERL error
-                $self->{aiplist}->{$aipid}->{'manifest md5'}='[unset]';
-            }
+        # Check if AIP already in database, but not new (possibly only set to be replicated)
+        if (exists $self->{aiplist}->{$aipid} && exists $self->{aiplist}->{$aipid}->{'manifest md5'}) {
             if ( $self->{aiplist}->{$aipid}->{'manifest md5'} ne
                  $updatedoc->{'manifest md5'}) {
                 if ($self->update) {
@@ -208,7 +205,6 @@ sub found_aip {
             if (! $self->quiet) {
                 print "New AIP found: $aipid\n";
             }
-            my $updatedoc=$t_repo->get_manifestinfo($aippath,{});
             $self->{aipfound}->{$aipid}=$updatedoc;
             if ($self->import) {
                 $update=1;
