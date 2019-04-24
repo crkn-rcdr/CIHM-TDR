@@ -27,7 +27,6 @@ lib/CIHM/TDR/REST/externalmeta.pm
 lib/CIHM/TDR/REST/filemeta.pm
 lib/CIHM/TDR/REST/internalmeta.pm
 lib/CIHM/TDR/REST/tdrepo.pm
-lib/CIHM/TDR/REST/tdrmeta.pm
 lib/CIHM/TDR/REST/UserAgent.pm
 lib/CIHM/TDR/REST/wipmeta.pm
 lib/CIHM/TDR/SIP.pm
