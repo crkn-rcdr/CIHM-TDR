@@ -2,8 +2,9 @@
 
 use strict;
 use warnings;
+
 use FindBin;
-use lib "$FindBin::RealBin/../../lib";
+use lib "$FindBin::RealBin/../lib";
 use CIHM::TDR::Replication;
 
 use Fcntl qw(:DEFAULT :flock);
