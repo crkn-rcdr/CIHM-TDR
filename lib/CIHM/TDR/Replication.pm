@@ -121,16 +121,9 @@ sub replicate {
 
     # One by one, sorted by priority, get the AIPs we should replicate
     my @replicateaips;
-    my $lastid='';
     while ( (@replicateaips=$self->tdrepo->get_replicate({ limit => 1}))
 	    && scalar(@replicateaips)) {
-	my $thisid=pop @replicateaips;
-	if ($thisid ne $lastid) {
-	    $self->replicateaip($thisid);
-	    $lastid=$thisid;
-	} else {
-	    $self->log->info("get_replicate returned $lastid again...");
-	}
+	$self->replicateaip(pop @replicateaips);
     }
 
 }
