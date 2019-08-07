@@ -2,13 +2,11 @@ package CIHM::TDR::REST::tdrepo;
 
 use strict;
 use Carp;
-use Data::Dumper;
 use DateTime;
 use JSON;
 
 use Moo;
 with 'Role::REST::Client';
-use Types::Standard qw(HashRef Str Int Enum HasMethods);
 
 =head1 NAME
 
@@ -289,12 +287,15 @@ sub get_replicate {
 
 
     $self->type("application/json");
-    my $limit='';
+    my $txtparams='';
     if ($params->{limit}) {
-        $limit="&limit=".$params->{limit};
+        $txtparams.="&limit=".$params->{limit};
+    }
+    if ($params->{skip}) {
+        $txtparams.="&skip=".$params->{skip};
     }
 
-    $res = $self->get("/".$self->{database}."/_design/tdr/_view/replicate?reduce=false&startkey=\[\"".$self->{repository}."\"\]&endkey=\[\"".$self->{repository}."\",\"999\"\]$limit",{}, {deserializer => 'application/json'});
+    $res = $self->get("/".$self->{database}."/_design/tdr/_view/replicate?reduce=false&startkey=\[\"".$self->{repository}."\"\]&endkey=\[\"".$self->{repository}."\",\"999\"\]$txtparams",{}, {deserializer => 'application/json'});
     if ($res->code == 200) {
         my @aips=();
         foreach my $aip (@{$res->data->{rows}}) {
