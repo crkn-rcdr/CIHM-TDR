@@ -2,9 +2,6 @@ package CIHM::TDR::Repository;
 
 use strict;
 use Config::General;
-use Data::Dumper;
-use Log::Log4perl;
-use Try::Tiny;
 use File::Spec;
 use File::Path qw(make_path remove_tree);
 use File::Basename;
@@ -13,7 +10,6 @@ use CIHM::TDR::TDRConfig;
 use CIHM::TDR::REST::tdrepo;
 use Filesys::Df;
 use Digest::MD5;
-my  $DEBUG=0;
 
 =head1 NAME
 
