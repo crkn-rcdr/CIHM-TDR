@@ -151,7 +151,7 @@ sub replicate {
     if (exists $options->{aip})  {
 	$self->replicateaip($options->{aip});
     } else {
-	my $txtopts;
+	my $txtopts='';
 	my $opts = { limit => 1};
 	if (exists $options->{skip}) {
 	    $opts->{skip}=$options->{skip};
@@ -169,14 +169,14 @@ sub replicate {
 		&& (@replicateaips=$self->tdrepo->get_replicate($opts))
 		&& scalar(@replicateaips)) {
 	    $limit-- if $limit;
-	    $self->replicateaip(pop @replicateaips);
+	    $self->replicateaip(pop @replicateaips,$options);
 	}
     }
 }
 
 
 sub replicateaip {
-    my ($self,$aip) = @_;
+    my ($self,$aip,$options) = @_;
     
     my ($contributor, $identifier) = split(/\./,$aip);
     my $aippath = $self->tdr_repo->find_aip_pool($contributor, $identifier);
@@ -213,12 +213,119 @@ sub replicateaip {
 	    $self->swift->object_put($self->container,$object, $fh, { 'File-Modified' => $filedate});
 	    close $fh;
 	}
+	my $validate = $self->validateaip($aip,$options);
+	if ($validate->{'validate'}) {
+	    if ($updatedoc->{'manifest date'} ne $validate->{'manifest date'}) {
+		carp "Manifest Date Mismatch: ".$updatedoc->{'manifest date'}." != ".$validate->{'manifest date'}."\n"; # This shouldn't ever happen
+	    }
+	    if ($updatedoc->{'manifest md5'} ne $validate->{'manifest md5'}) {
+		carp "Manifest MD5 Mismatch: ".$updatedoc->{'manifest md5'}." != ".$validate->{'manifest md5'}."\n"; # This shouldn't ever happen
+	    }
+	}
     } else {
 	carp "$aip not found\n";  # This shouldn't ever happen
     }
     
     # Inform database
     $self->tdrepo->update_item_repository($aip,$updatedoc);
+}
+
+sub validate {
+    my ($self,$options) = @_;
+
+    if (exists $options->{aip})  {
+	$self->validateaip($options->{aip},$options);
+    } else {
+
+	my $aiplistresp = $self->swift->container_get($self->container, {
+	    delimiter => "/"
+						      });
+	if ($aiplistresp->code != 200) {
+	    croak "container_get(".$self->container.") returned ". $aiplistresp->code . " - " . $aiplistresp->message. "\n";
+	};
+	foreach my $subdir (@{$aiplistresp->content}) {
+	    my $aip = $subdir->{subdir};
+	    chop($aip);
+	    my $val = $self->validateaip($aip,$options);
+	    if ($val->{validate}) {
+		$self->log->info("verified Swift AIP: $aip");
+	    } else {
+		$self->log->warn("invalid Swift AIP: $aip");
+	    }
+	}
+    }
+}
+
+sub validateaip {
+    my ($self,$aip,$options) = @_;
+
+    my $verbose = exists $options->{'verbose'};
+    
+    # Assume validated unless problem found
+    my %return = (
+	"validate" => 1,
+	"filesize" => 0
+	);
+
+    my $aipdataresp = $self->swift->container_get($self->container, {
+	prefix => $aip."/data/"
+					      });
+    if ($aipdataresp->code != 200) {
+	croak "container_get(".$self->container.") returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+    };
+    my %aipdata;
+    foreach my $object (@{$aipdataresp->content}) {
+	my $file=substr $object->{name},(length $aip)+1;
+	$aipdata{$file}=$object;
+    }
+    undef $aipdataresp;
+
+    
+    my $manifest=$aip."/manifest-md5.txt";
+    my $aipmanifest = $self->swift->object_get($self->container,$manifest);
+    if ($aipmanifest->code != 200) {
+	croak "object_get container: '".$self->container."' , object: '$manifest'  returned ". $aipmanifest->code . " - " . $aipmanifest->message. "\n";
+    };
+    $return{'manifest date'}=$aipmanifest->object_meta_header('File-Modified');
+    $return{'manifest md5'}=$aipmanifest->etag;
+    my @lines= split /\n/,$aipmanifest->content;
+    foreach my $line (@lines) {
+	if ($line =~ /^\s*([^\s]+)\s+([^\s]+)\s*/) {
+	    my ($md5,$file)=($1,$2);
+	    if (exists $aipdata{$file}) {
+		$return{filesize}+=$aipdata{$file}{'bytes'};
+		if ($aipdata{$file}{'hash'} ne $md5) {
+		    print "MD5 mismatch: ".Dumper($file,$md5,$aipdata{$file}) if $verbose;
+		    $return{validate}=0;
+		}
+		$aipdata{$file}{'checked'}=1;
+	    } else {
+		print "File '$file' missing from Swift\n"
+		    if $verbose;
+		$return{validate}=0;
+	    }
+	}
+    }
+    if (scalar(@lines) != scalar(keys %aipdata)) {
+	$return{validate}=0;
+	if ($verbose) {
+	    foreach my $key (keys %aipdata) {
+		if (! exists $aipdata{$key}{'checked'}) {
+		    print "File '$key' is extra in Swift\n"
+		}
+	    }
+	}
+    }
+
+    if($return{validate}) {
+	# Update CouchDB...
+	$self->tdrepo->update_item_repository($aip, {
+	    'verified' => 'now',
+	    'filesize' => $return{filesize}
+					});
+    }
+    print Dumper (\%return) if $verbose;
+    return \%return;
 }
 
 1;
