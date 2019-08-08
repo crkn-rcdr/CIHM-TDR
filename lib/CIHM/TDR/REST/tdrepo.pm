@@ -268,7 +268,6 @@ sub get_newestaip {
 sub get_repostats {
     my ($self) = @_;
     my ($res, $code);
-    my $restq = {};
 
     $self->type("application/json");
     $res = $self->get("/".$self->{database}."/_design/tdr/_view/repoown?group_level=1",{}, {deserializer => 'application/json'});
