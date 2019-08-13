@@ -9,7 +9,7 @@ use Getopt::Long;
 use CIHM::TDR::Swift;
 
 use Fcntl qw(:DEFAULT :flock);
-my $lockfile = '/var/lock/tdr/tdr-swiftreplicate';
+my $lockfile = '/var/lock/tdr/tdr-swiftvalidate';
 
 # Only allow one instance to run at a time..
 sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
@@ -26,6 +26,6 @@ my $config= {
     configpath => $conf
 };
 
-CIHM::TDR::Swift->new($config)->replicate(\%options);
+CIHM::TDR::Swift->new($config)->validate(\%options);
 
 1;

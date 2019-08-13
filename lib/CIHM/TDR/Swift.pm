@@ -149,7 +149,7 @@ sub replicate {
     my ($self,$options) = @_;
 
     if (exists $options->{aip})  {
-	$self->replicateaip($options->{aip});
+	$self->replicateaip($options->{aip},$options);
     } else {
 	my $txtopts='';
 	my $opts = { limit => 1};
@@ -178,6 +178,7 @@ sub replicate {
 sub replicateaip {
     my ($self,$aip,$options) = @_;
     
+    my $verbose = exists $options->{'verbose'};
     my ($contributor, $identifier) = split(/\./,$aip);
     my $aippath = $self->tdr_repo->find_aip_pool($contributor, $identifier);
 
@@ -198,20 +199,85 @@ sub replicateaip {
 	    $aippath
 	    );
 
-	foreach my $aipfile (@aipfiles) {
-	    my $object = $aip . substr $aipfile, length $aippath;
+	# To support AIP updates, check what files already exist
+	my $aipdataresp = $self->swift->container_get($self->container, {
+	    prefix => $aip."/"
+						      });
+	if ($aipdataresp->code != 200) {
+	    croak "container_get(".$self->container.") returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	};
+	my %aipdata;
+	foreach my $object (@{$aipdataresp->content}) {
+	    my $file=substr $object->{name},(length $aip)+1;
+	    $aipdata{$file}=$object;
+	}
+	undef $aipdataresp;
 
+	if (defined $aipdata{'manifest-md5.txt'} &&
+	    $aipdata{'manifest-md5.txt'}{'hash'} eq $updatedoc->{'manifest md5'}
+	    ) {
+	    $self->log->info("$aip with md5(". $updatedoc->{'manifest md5'} . ") already exists.");
+	} else {
+
+	    # Load manifest to get MD5 of data files.
+	    my $aipfile = $aippath."/manifest-md5.txt";
 	    open(my $fh, '<:raw', $aipfile)
 		or die "replicate_aip: Could not open file '$aipfile' $!\n";
-
-	    my $filedate="unknown";
-	    my $mtime=(stat($fh))[9];
-	    if ($mtime) {
-		my $dt = DateTime->from_epoch(epoch => $mtime);
-		$filedate = $dt->datetime. "Z";
-	    }
-	    $self->swift->object_put($self->container,$object, $fh, { 'File-Modified' => $filedate});
+	    chomp(my @lines = <$fh>);
 	    close $fh;
+	    foreach my $line (@lines) {
+		if ($line =~ /^\s*([^\s]+)\s+([^\s]+)\s*/) {
+		    my ($md5,$file)=($1,$2);
+		    if (exists $aipdata{$file}) {
+			# Fill in md5 from manifest to compare before sending
+			$aipdata{$file}{'md5'} = $md5;
+		    }
+		}
+	    }
+
+	    # looping through filenames found on filesystem.
+	    foreach my $aipfile (@aipfiles) {
+		my $file = substr $aipfile, (length $aippath)+1;
+		my $object = $aip . '/' . $file;
+
+		# Check if file with same md5 already on Swift
+		if (! exists $aipdata{$file} ||
+		    ! exists $aipdata{$file}{'md5'} ||
+		    $aipdata{$file}{'md5'} ne  $aipdata{$file}{'hash'}
+		    ) {
+
+		    open(my $fh, '<:raw', $aipfile)
+			or die "replicate_aip: Could not open file '$aipfile' $!\n";
+
+		    my $filedate="unknown";
+		    my $mtime=(stat($fh))[9];
+		    if ($mtime) {
+			my $dt = DateTime->from_epoch(epoch => $mtime);
+			$filedate = $dt->datetime. "Z";
+		    }
+		    print "Put $object\n" if $verbose;
+
+		    my $putresp = $self->swift->object_put($self->container,$object, $fh, { 'File-Modified' => $filedate});
+		    if ($putresp->code != 201) {
+			$self->log->warn("object_put of $object returned ".$putresp->code . " - " . $putresp->message);
+		    }
+		    close $fh;
+		}
+		# Remove key, to allow detection of extra files in Swift
+		delete  $aipdata{$file};
+	    }
+	    if (keys %aipdata) {
+		# These files existed on Swift, but not on disk, so delete
+		# (Files with different names in different AIP revision)
+		foreach my $key (keys %aipdata) {
+		    my $delresp =
+			$self->swift->object_delete($self->container,
+						    $aipdata{$key}{'name'});
+		    if ($delresp->code != 204) {
+			$self->log->warn("object_delete of ". $aipdata{$key}{'name'}." returned ".$delresp->code . " - " . $delresp->message);
+		    }
+		}
+	    }
 	}
 	my $validate = $self->validateaip($aip,$options);
 	if ($validate->{'validate'}) {
@@ -221,6 +287,8 @@ sub replicateaip {
 	    if ($updatedoc->{'manifest md5'} ne $validate->{'manifest md5'}) {
 		carp "Manifest MD5 Mismatch: ".$updatedoc->{'manifest md5'}." != ".$validate->{'manifest md5'}."\n"; # This shouldn't ever happen
 	    }
+	} else {
+	    $self->log->warn("validation of $aip failed");
 	}
     } else {
 	carp "$aip not found\n";  # This shouldn't ever happen
