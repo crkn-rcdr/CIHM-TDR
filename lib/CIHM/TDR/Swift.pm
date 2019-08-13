@@ -38,8 +38,10 @@ sub new {
 
     # Undefined if no <swift> config block
     if(exists $confighash{swift}) {
-	my %swiftopt;
-	foreach ("server","user","password","account") {
+	my %swiftopt = (
+	    furl_options => { timeout => 120 }
+	    );
+	foreach ("server","user","password","account", "furl_options") {
 	    if (exists  $confighash{swift}{$_}) {
 		$swiftopt{$_}=$confighash{swift}{$_};
 	    }
@@ -200,19 +202,31 @@ sub replicateaip {
 	    );
 
 	# To support AIP updates, check what files already exist
-	my $aipdataresp = $self->swift->container_get($self->container, {
-	    prefix => $aip."/"
-						      });
-	if ($aipdataresp->code != 200) {
-	    croak "container_get(".$self->container.") returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
-	};
+	my %containeropt = (
+	    "prefix" => $aip."/"
+	    );
 	my %aipdata;
-	foreach my $object (@{$aipdataresp->content}) {
-	    my $file=substr $object->{name},(length $aip)+1;
-	    $aipdata{$file}=$object;
-	}
-	undef $aipdataresp;
 
+	# Need to loop possibly multiple times as Swift has a maximum of
+	# 10,000 names.
+	my $more=1;
+	while ($more) {
+	    my $aipdataresp = $self->swift->container_get($self->container,
+							  \%containeropt);
+	    if ($aipdataresp->code != 200) {
+		croak "container_get(".$self->container.") for $aip returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	    };
+	    $more=scalar(@{$aipdataresp->content});
+	    if ($more) {
+		$containeropt{'marker'}=$aipdataresp->content->[$more-1]->{name};
+
+		foreach my $object (@{$aipdataresp->content}) {
+		    my $file=substr $object->{name},(length $aip)+1;
+		    $aipdata{$file}=$object;
+		}
+	    }
+	    undef $aipdataresp;
+	}
 	if (defined $aipdata{'manifest-md5.txt'} &&
 	    $aipdata{'manifest-md5.txt'}{'hash'} eq $updatedoc->{'manifest md5'}
 	    ) {
@@ -262,6 +276,8 @@ sub replicateaip {
 			$self->log->warn("object_put of $object returned ".$putresp->code . " - " . $putresp->message);
 		    }
 		    close $fh;
+		} elsif ($verbose) {
+		    #print $object." already exists on Swift\n";
 		}
 		# Remove key, to allow detection of extra files in Swift
 		delete  $aipdata{$file};
@@ -309,7 +325,7 @@ sub validate {
 	    delimiter => "/"
 						      });
 	if ($aiplistresp->code != 200) {
-	    croak "container_get(".$self->container.") returned ". $aiplistresp->code . " - " . $aiplistresp->message. "\n";
+	    croak "container_get(".$self->container.") with delimiter='/' for validate returned ". $aiplistresp->code . " - " . $aiplistresp->message. "\n";
 	};
 	foreach my $subdir (@{$aiplistresp->content}) {
 	    my $aip = $subdir->{subdir};
@@ -335,20 +351,30 @@ sub validateaip {
 	"filesize" => 0
 	);
 
-    my $aipdataresp = $self->swift->container_get($self->container, {
-	prefix => $aip."/data/"
-					      });
-    if ($aipdataresp->code != 200) {
-	croak "container_get(".$self->container.") returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
-    };
+    my %containeropt = (
+	"prefix" => $aip."/data/"
+	);
     my %aipdata;
-    foreach my $object (@{$aipdataresp->content}) {
-	my $file=substr $object->{name},(length $aip)+1;
-	$aipdata{$file}=$object;
-    }
-    undef $aipdataresp;
 
-    
+    # Need to loop possibly multiple times as Swift has a maximum of
+    # 10,000 names.
+    my $more=1;
+    while ($more) {
+        my $aipdataresp = $self->swift->container_get($self->container, \%containeropt);
+	if ($aipdataresp->code != 200) {
+	    croak "container_get(".$self->container.") for $aip/data/ for validate_aip returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	};
+	$more=scalar(@{$aipdataresp->content});
+	if ($more) {
+	    $containeropt{'marker'}=$aipdataresp->content->[$more-1]->{name};
+
+	    foreach my $object (@{$aipdataresp->content}) {
+		my $file=substr $object->{name},(length $aip)+1;
+		$aipdata{$file}=$object;
+	    }
+	}
+	undef $aipdataresp;
+    }
     my $manifest=$aip."/manifest-md5.txt";
     my $aipmanifest = $self->swift->object_get($self->container,$manifest);
     if ($aipmanifest->code != 200) {
