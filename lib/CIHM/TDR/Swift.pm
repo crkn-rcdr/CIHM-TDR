@@ -150,29 +150,25 @@ sub set_replicationwork {
 sub replicate {
     my ($self,$options) = @_;
 
-    if (exists $options->{aip})  {
-	$self->replicateaip($options->{aip},$options);
-    } else {
-	my $txtopts='';
-	my $opts = { limit => 1};
-	if (exists $options->{skip}) {
-	    $opts->{skip}=$options->{skip};
-	    $txtopts .= " skip=". $opts->{skip};
-	}
-	my $limit;
-	if (exists $options->{limit}) {
-	    $limit=$options->{limit};
-	    $txtopts .= " limit=$limit";
-	}
-	$self->log->info("Replicate: $txtopts");
-	# One by one, sorted by priority, get the AIPs we should replicate
-	my @replicateaips;
-	while ( ((! defined $limit) || $limit>0)
-		&& (@replicateaips=$self->tdrepo->get_replicate($opts))
-		&& scalar(@replicateaips)) {
-	    $limit-- if $limit;
-	    $self->replicateaip(pop @replicateaips,$options);
-	}
+    my $txtopts='';
+    my $opts = { limit => 1};
+    if (exists $options->{skip}) {
+	$opts->{skip}=$options->{skip};
+	$txtopts .= " skip=". $opts->{skip};
+    }
+    my $limit;
+    if (exists $options->{limit}) {
+	$limit=$options->{limit};
+	$txtopts .= " limit=$limit";
+    }
+    $self->log->info("Replicate: $txtopts");
+    # One by one, sorted by priority, get the AIPs we should replicate
+    my @replicateaips;
+    while ( ((! defined $limit) || $limit>0)
+	    && (@replicateaips=$self->tdrepo->get_replicate($opts))
+	    && scalar(@replicateaips)) {
+	$limit-- if $limit;
+	$self->replicateaip(pop @replicateaips,$options);
     }
 }
 
