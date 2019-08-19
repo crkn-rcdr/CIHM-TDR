@@ -65,6 +65,7 @@ sub replicateaip {
   }
 
   $self->{aip}=$aip;
+  my $error;
   try {
       my %options;
       if($verbose) {
@@ -73,8 +74,9 @@ sub replicateaip {
       $self->swift->replicateaip($aip,\%options);
   } catch {
       $self->log->error("$aip: $_");
+      $error=1;
   };
-  return ($aip);
+  return ($aip,$error);
 }
 
 1;

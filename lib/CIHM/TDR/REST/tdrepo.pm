@@ -286,15 +286,19 @@ sub get_replicate {
 
 
     $self->type("application/json");
-    my $txtparams='';
+    my $txtparams;
+    if ($params->{descending}) {
+        $txtparams="&endkey=\[\"".$self->{repository}."\"\]&startkey=\[\"".$self->{repository}."\",\"999\"\]&descending=true";
+    } else {
+        $txtparams="&startkey=\[\"".$self->{repository}."\"\]&endkey=\[\"".$self->{repository}."\",\"999\"\]";
+    }
     if ($params->{limit}) {
         $txtparams.="&limit=".$params->{limit};
     }
     if ($params->{skip}) {
         $txtparams.="&skip=".$params->{skip};
     }
-
-    $res = $self->get("/".$self->{database}."/_design/tdr/_view/replicate?reduce=false&startkey=\[\"".$self->{repository}."\"\]&endkey=\[\"".$self->{repository}."\",\"999\"\]$txtparams",{}, {deserializer => 'application/json'});
+    $res = $self->get("/".$self->{database}."/_design/tdr/_view/replicate?reduce=false$txtparams",{}, {deserializer => 'application/json'});
     if ($res->code == 200) {
         my @aips=();
         foreach my $aip (@{$res->data->{rows}}) {
