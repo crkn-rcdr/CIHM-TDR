@@ -223,12 +223,8 @@ sub replicateaip {
 	    }
 	    undef $aipdataresp;
 	}
-	if (defined $aipdata{'manifest-md5.txt'} &&
-	    $aipdata{'manifest-md5.txt'}{'hash'} eq $updatedoc->{'manifest md5'}
-	    ) {
-	    $self->log->info("$aip with md5(". $updatedoc->{'manifest md5'} . ") already exists.");
-	} else {
 
+	{
 	    # Load manifest to get MD5 of data files.
 	    my $aipfile = $aippath."/manifest-md5.txt";
 	    open(my $fh, '<:raw', $aipfile)
@@ -269,7 +265,7 @@ sub replicateaip {
 
 		    my $putresp = $self->swift->object_put($self->container,$object, $fh, { 'File-Modified' => $filedate});
 		    if ($putresp->code != 201) {
-			$self->log->warn("object_put of $object returned ".$putresp->code . " - " . $putresp->message);
+			die("object_put of $object returned ".$putresp->code . " - " . $putresp->message."\n");
 		    }
 		    close $fh;
 		} elsif ($verbose) {
