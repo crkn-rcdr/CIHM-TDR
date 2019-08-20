@@ -327,6 +327,7 @@ sub validate {
 		$self->log->info("verified Swift AIP: $aip");
 	    } else {
 		$self->log->warn("invalid Swift AIP: $aip");
+		print "invalid Swift AIP: $aip\n";
 	    }
 	}
     }
