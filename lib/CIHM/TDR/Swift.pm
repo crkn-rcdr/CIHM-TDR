@@ -306,6 +306,7 @@ sub replicateaip {
     $self->tdrepo->update_item_repository($aip,$updatedoc);
 }
 
+# Options include: 'skip:i','timelimit:i','limit:i','verbose','aip:s'
 sub validate {
     my ($self,$options) = @_;
 
@@ -313,23 +314,49 @@ sub validate {
 	$self->validateaip($options->{aip},$options);
     } else {
 
-	my $aiplistresp = $self->swift->container_get($self->container, {
-	    delimiter => "/"
-						      });
-	if ($aiplistresp->code != 200) {
-	    croak "container_get(".$self->container.") with delimiter='/' for validate returned ". $aiplistresp->code . " - " . $aiplistresp->message. "\n";
+	my $start_time=time();
+	my $validatecount=0;
+	my $errorcount=0;
+
+	$self->log->info("Running validation at: $start_time");
+	my $repotxt="reduce=false&startkey=[\"swift\"]&endkey=[\"swift\",{}]";
+	if ($options->{limit}) {
+	    $repotxt .= "&limit=".$options->{limit};
+	}
+	if ($options->{skip}) {
+	    $repotxt .= "&skip=".$options->{skip};
+	}
+
+	my $res = $self->tdrepo->get("/".$self->tdrepo->database."/_design/tdr/_view/repopoolverified?$repotxt",{}, {deserializer => 'application/json'});
+
+	if ($res->code != 200) {
+	    croak "repopoolverified for validate returned ". $res->code . " - " . $res->error. "\n";
 	};
-	foreach my $subdir (@{$aiplistresp->content}) {
-	    my $aip = $subdir->{subdir};
-	    chop($aip);
+	my @aiplist;
+	foreach my $aipdoc (@{$res->data->{rows}}) {
+	    push @aiplist, $aipdoc->{value};
+	};
+	undef $res;
+
+	foreach my $aip (@aiplist) {
+	    if (exists $options->{timelimit} &&
+		(time()-$start_time)> $options->{timelimit}) {
+		last;
+	    };
 	    my $val = $self->validateaip($aip,$options);
 	    if ($val->{validate}) {
+		$validatecount++;
 		$self->log->info("verified Swift AIP: $aip");
 	    } else {
+		$errorcount++;
 		$self->log->warn("invalid Swift AIP: $aip");
 		print "invalid Swift AIP: $aip\n";
 	    }
 	}
+	print "total valid bags: $validatecount\n";
+	print "total invalid bags: $errorcount\n";
+	$self->log->info("total valid bags: $validatecount invalid: $errorcount");
+	print "total time: ".(time()-$start_time)."\n";
     }
 }
 
@@ -413,6 +440,127 @@ sub validateaip {
     }
     print Dumper (\%return) if $verbose;
     return \%return;
+}
+
+sub walk {
+    my ($self,$options) = @_;
+
+
+    # Get list from CouchDB
+    my $res = $self->tdrepo->get("/".$self->tdrepo->database."/_design/tdr/_list/manifestinfo/tdr/repoown?reduce=false&startkey=[\"swift\"]&endkey=[\"swift\",{}]&include_docs=true",{}, {});
+    if ($res->code != 200) {
+	print STDERR ("Walk tdrepo->get return code: ".$res->code . "\nError: " . $res->error ."\n");
+    }
+    if ($res->failed) {
+	die ("Walk tdrepo->get failed flag set\n". $res->response->as_string() . "\n");
+    }
+    if (! keys $res->data) {
+	die ("Walk tdrepo->get empty hash\n". $res->response->as_string() . "\n");
+    }
+    my $aiplist=$res->data;
+
+    # Count of AIPs with each storage
+    my %counts = (
+	swift => 0,
+	couch => scalar (keys %{$aiplist})
+	);
+
+    # Walk though AIP list in Swift
+    my %containeropt = (
+	 delimiter => "/"
+	);
+    # Need to loop possibly multiple times as Swift has a maximum of
+    # 10,000 names.
+    my $more=1;
+    while ($more) {
+	my $aipdataresp = $self->swift->container_get($self->container,
+							  \%containeropt);
+	if ($aipdataresp->code != 200) {
+	    croak "container_get(".$self->container.") returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	};
+	$more=scalar(@{$aipdataresp->content});
+	if ($more) {
+	    $containeropt{'marker'}=$aipdataresp->content->[$more-1]->{subdir};
+
+	    foreach my $object (@{$aipdataresp->content}) {
+		my $aip = substr $object->{subdir},0,-1;
+		$self->walk_aip($options,$aip,$aiplist, \%counts);
+	    }
+	}
+    }
+
+    my $aiplistcount = keys %{$aiplist};
+    if (! $options->{quiet} && ($aiplistcount > 0)) {
+	print "There were $aiplistcount AIPs only found in DB:\n--begin--\n";
+	foreach my $aipkey (keys %{$aiplist}) {
+	    print "$aipkey\n";
+	}
+	print "--end--\n";
+    }
+
+    print $counts{swift} . " AIPS found in Swift";
+    if ($counts{swift} == $counts{couch}) {
+	print .".\n";
+    } else {
+	print ", only ".$counts{couch}." in database.\n";
+    }
+}
+
+sub walk_aip {
+    my ($self,$options,$aip,$aiplist,$counts) = @_;
+
+    my $count = ($counts->{swift})++;
+
+    my $aipres = $self->swift->object_head($self->container,
+					   "$aip/manifest-md5.txt");
+    if ($aipres->code != 200) {
+	die "object_head: '".$self->container."' , object: 'aip/manifest-md5.txt'  returned ". $aipres->code . " - " . $aipres->message. "\n";
+    };
+
+
+    my $update=0;
+    my $updatedoc = {
+	'manifest md5' => $aipres->etag,
+	'manifest date' => $aipres->object_meta_header('file-modified')
+    };
+
+    if (exists $aiplist->{$aip} && exists $aiplist->{$aip}->{'manifest md5'}) {
+	if ( $aiplist->{$aip}->{'manifest md5'} ne
+	     $updatedoc->{'manifest md5'}) {
+	    $update=1;
+	    if (! $options->{quiet}) {
+		print "MD5 mismatch $aip: ".$self->{aiplist}->{$aip}->{'manifest md5'}." != ".$updatedoc->{'manifest md5'}."\n";
+	    }
+	}
+
+	if (! exists $aiplist->{$aip}->{'manifest date'}) {
+	    # Initialize variable -- will be noticed as mismatch, but without PERL error
+	    $aiplist->{$aip}->{'manifest date'}='[unset]';
+	}
+	if ( $aiplist->{$aip}->{'manifest date'} ne
+	     $updatedoc->{'manifest date'}) {
+	    $update=1;
+	    if (! $options->{quiet}) {
+		print "Date mismatch $aip: ".$aiplist->{$aip}->{'manifest date'}." != ".$updatedoc->{'manifest date'}."\n";
+	    }
+	}
+	delete $aiplist->{$aip};
+
+    } else {
+
+	if (! $options->{quiet}) {
+	    print "New Swift AIP found: $aip\n";
+	}
+	$update=1;
+    }
+
+    if ($update && $options->{update}) {
+	if (! $options->{quietupdate}) {
+	    print "Updating: " .
+		Data::Dumper->new([$updatedoc],[$aip])->Dump . "\n";
+	}
+	$self->tdr_repo->update_item_repository($aip,$updatedoc);
+    }
 }
 
 1;
