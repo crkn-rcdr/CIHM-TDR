@@ -445,6 +445,8 @@ sub validateaip {
 sub walk {
     my ($self,$options) = @_;
 
+    $| = 1;
+    print "Loading AIP list from CouchDB database...";
 
     # Get list from CouchDB
     my $res = $self->tdrepo->get("/".$self->tdrepo->database."/_design/tdr/_list/manifestinfo/tdr/repoown?reduce=false&startkey=[\"swift\"]&endkey=[\"swift\",{}]&include_docs=true",{}, {});
@@ -464,6 +466,8 @@ sub walk {
 	swift => 0,
 	couch => scalar (keys %{$aiplist})
 	);
+
+    print " ".$counts{couch}." found in DB.\n";
 
     # Walk though AIP list in Swift
     my %containeropt = (
@@ -490,20 +494,23 @@ sub walk {
     }
 
     my $aiplistcount = keys %{$aiplist};
+    my $nomanifest=0;
     if (! $options->{quiet} && ($aiplistcount > 0)) {
-	print "There were $aiplistcount AIPs only found in DB:\n--begin--\n";
+	print "There were $aiplistcount AIPs only found in DB. Listing those with manifests:\n--begin--\n";
 	foreach my $aipkey (keys %{$aiplist}) {
-	    print "$aipkey\n";
+	    if (exists $aiplist->{$aipkey}->{'manifest md5'}) {
+		print "$aipkey\n";
+	    } else {
+		$nomanifest++;
+	    }
 	}
 	print "--end--\n";
+	if ($nomanifest) {
+	    print "There were $nomanifest AIPs without manifests (most likely being replicated)\n";
+	}
     }
 
-    print $counts{swift} . " AIPS found in Swift";
-    if ($counts{swift} == $counts{couch}) {
-	print .".\n";
-    } else {
-	print ", only ".$counts{couch}." in database.\n";
-    }
+    print $counts{swift} . " AIPS found in Swift, ".$counts{couch}." in CouchDB database.\n";
 }
 
 sub walk_aip {
@@ -524,20 +531,22 @@ sub walk_aip {
 	'manifest date' => $aipres->object_meta_header('file-modified')
     };
 
-    if (exists $aiplist->{$aip} && exists $aiplist->{$aip}->{'manifest md5'}) {
+    if (exists $aiplist->{$aip}) {
+	if (! exists $aiplist->{$aip}->{'manifest md5'}) {
+	    # Initialize variable -- will be noticed as mismatch, but without PERL error
+	    $aiplist->{$aip}->{'manifest md5'}='[unset]';
+	}
+	if (! exists $aiplist->{$aip}->{'manifest date'}) {
+	    # Initialize variable -- will be noticed as mismatch, but without PERL error
+	    $aiplist->{$aip}->{'manifest date'}='[unset]';
+	}
 	if ( $aiplist->{$aip}->{'manifest md5'} ne
 	     $updatedoc->{'manifest md5'}) {
 	    $update=1;
 	    if (! $options->{quiet}) {
 		print "MD5 mismatch $aip: ".$self->{aiplist}->{$aip}->{'manifest md5'}." != ".$updatedoc->{'manifest md5'}."\n";
 	    }
-	}
-
-	if (! exists $aiplist->{$aip}->{'manifest date'}) {
-	    # Initialize variable -- will be noticed as mismatch, but without PERL error
-	    $aiplist->{$aip}->{'manifest date'}='[unset]';
-	}
-	if ( $aiplist->{$aip}->{'manifest date'} ne
+	} elsif ( $aiplist->{$aip}->{'manifest date'} ne
 	     $updatedoc->{'manifest date'}) {
 	    $update=1;
 	    if (! $options->{quiet}) {
@@ -547,7 +556,6 @@ sub walk_aip {
 	delete $aiplist->{$aip};
 
     } else {
-
 	if (! $options->{quiet}) {
 	    print "New Swift AIP found: $aip\n";
 	}
