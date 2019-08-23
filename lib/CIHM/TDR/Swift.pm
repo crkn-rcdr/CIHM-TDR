@@ -544,7 +544,7 @@ sub walk_aip {
 	     $updatedoc->{'manifest md5'}) {
 	    $update=1;
 	    if (! $options->{quiet}) {
-		print "MD5 mismatch $aip: ".$self->{aiplist}->{$aip}->{'manifest md5'}." != ".$updatedoc->{'manifest md5'}."\n";
+		print "MD5 mismatch $aip: ".$aiplist->{$aip}->{'manifest md5'}." != ".$updatedoc->{'manifest md5'}."\n";
 	    }
 	} elsif ( $aiplist->{$aip}->{'manifest date'} ne
 	     $updatedoc->{'manifest date'}) {
