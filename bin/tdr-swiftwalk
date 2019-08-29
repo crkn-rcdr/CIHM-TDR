@@ -9,23 +9,22 @@ use Getopt::Long;
 use CIHM::TDR::Swift;
 
 use Fcntl qw(:DEFAULT :flock);
-my $lockfile = '/var/lock/tdr/tdr-swiftvalidate';
+my $lockfile = '/var/lock/tdr/tdr-swiftwalk';
+my $conf = "/etc/canadiana/tdr/tdr.conf";
+my %options;
+GetOptions ( \%options,'conf:s' => \$conf, 'lockfile:s' => \$lockfile,
+	     'import','update','quiet','quietupdate');
 
 # Only allow one instance to run at a time..
-sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
+sysopen(FH, $lockfile, O_WRONLY | O_CREAT)
   or die "can't open lockfile=$lockfile: $!\n";
 flock(FH, LOCK_EX | LOCK_NB)
   or exit 0;
-
-my $conf = "/etc/canadiana/tdr/tdr.conf";
-my %options;
-GetOptions ( \%options,'conf:s' => \$conf,
-	     'skip:i','timelimit:i','limit:i','verbose','aip:s');
 
 my $config= {
     configpath => $conf
 };
 
-CIHM::TDR::Swift->new($config)->validate(\%options);
+CIHM::TDR::Swift->new($config)->walk(\%options);
 
 1;

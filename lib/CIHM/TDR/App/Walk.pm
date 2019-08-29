@@ -65,12 +65,20 @@ sub run {
   }
 
   my $aiplist= keys $self->{aiplist};
+  my $nomanifest=0;
   if (! $self->quiet && ($aiplist > 0)) {
-      print "There were $aiplist AIPs only found in DB:\n--begin--\n";
+      print "There were $aiplist AIPs only found in DB.  Listing those with manifests:\n--begin--\n";
       foreach my $aipkey (keys $self->{aiplist}) {
-          print "$aipkey\n";
+	  if (exists $self->{aiplist}->{$aipkey}->{'manifest md5'}) {
+	      print "$aipkey\n";
+	  } else {
+	      $nomanifest++;
+	  }
       }
       print "--end--\n";
+      if ($nomanifest) {
+	  print "There were $nomanifest AIPs without manifests (most likely being replicated)\n";
+      }
   }
 
   my $aipfound= keys $self->{aipfound};
