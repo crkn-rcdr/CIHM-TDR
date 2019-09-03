@@ -297,6 +297,8 @@ sub replicateaip {
 	    }
 	} else {
 	    $self->log->warn("validation of $aip failed");
+	    delete $updatedoc->{'manifest date'};
+	    delete $updatedoc->{'manifest md5'};
 	}
     } else {
 	carp "$aip not found\n";  # This shouldn't ever happen
