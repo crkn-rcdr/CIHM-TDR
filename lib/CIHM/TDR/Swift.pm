@@ -413,6 +413,10 @@ sub replicateaipfrom {
 	    if ($bagit->{stats} && $bagit->{stats}->{size}) {
 		$updatedoc->{'filesize'}=$bagit->{stats}->{size};
 	    }
+	    # If it was valid, mark current datetime as last validation
+	    if ($valid) {
+		$updatedoc->{'verified'}='now';
+	    };
 	    $success = $valid;
 	};
 	if (!$success) {
