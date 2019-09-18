@@ -85,7 +85,6 @@ sub new {
             repository => $self->{reponame},
             clientattrs => {timeout => 3600},
             );
-        $self->{tdrepo_updateadd}=exists $confighash{tdrepo}{updateadd};
     }
     return $self;
 }
@@ -94,10 +93,6 @@ sub new {
 sub tdrepo {
     my ($self) = shift;
     return $self->{tdrepo};
-}
-sub tdrepo_updateadd {
-    my ($self) = shift;
-    return $self->{tdrepo_updateadd};
 }
 sub logger {
     my ($self) = shift;
@@ -517,10 +512,6 @@ sub aip_add_db {
 
     if (!$self->tdrepo) {
         # There are no databases configured
-        return;
-    }
-    if (!$self->tdrepo_updateadd) {
-        # Flag that indicates database should be updated on add not set
         return;
     }
     if (!$updatedoc) {

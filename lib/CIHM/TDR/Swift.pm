@@ -68,7 +68,6 @@ sub new {
             repository => $self->repository,
             clientattrs => {timeout => 3600},
             );
-        $self->{tdrepo_updateadd}=exists $confighash{tdrepo}{updateadd};
     } else {
         croak "Missing <tdrepo> configuration block in config\n";
     }
@@ -463,8 +462,6 @@ sub replicateaipfrom {
         $updatedoc->{filesize}="";
         $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
         exit;
-    } else {
-	$self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
     }
 }
 
