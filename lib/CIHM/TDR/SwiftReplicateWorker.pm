@@ -54,7 +54,7 @@ sub warnings {
 
 
 sub replicateaip {
-  my ($aip,$configpath,$verbose) = @_;
+  my ($aip,$configpath,$verbose,$fromswift) = @_;
   our $self;
 
   # Capture warnings
@@ -71,7 +71,11 @@ sub replicateaip {
       if($verbose) {
 	  $options{'verbose'}=1;
       }
-      $self->swift->replicateaip($aip,\%options);
+      if ($fromswift) {
+	  $self->swift->replicateaipfrom($aip,\%options);
+      } else {
+	  $self->swift->replicateaip($aip,\%options);
+      }
   } catch {
       $self->log->error("$aip: $_");
       $error=1;

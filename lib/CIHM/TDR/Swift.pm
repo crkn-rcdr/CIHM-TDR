@@ -4,12 +4,18 @@ use strict;
 use warnings;
 
 use Carp;
+use Try::Tiny;
 use CIHM::TDR::TDRConfig;
 use CIHM::Swift::Client;
 use CIHM::TDR::Repository;
+use Archive::BagIt::Fast;
 use Data::Dumper;
 use File::Find;
-
+use File::Basename;
+use File::Path qw(make_path remove_tree);
+use DateTime;
+use DateTime::Format::ISO8601;
+use Digest::MD5;
 
 =head1 NAME
 
@@ -306,6 +312,261 @@ sub replicateaip {
     
     # Inform database
     $self->tdrepo->update_item_repository($aip,$updatedoc);
+}
+
+sub replicateaipfrom {
+    my ($self,$aip,$options) = @_;
+
+    my $verbose = exists $options->{'verbose'};
+    my ($contributor, $identifier) = split(/\./,$aip);
+    my $aippath = $self->tdr_repo->find_aip_pool($contributor, $identifier);
+
+    my $updatedoc = {};
+    if ($aippath) {
+	$updatedoc = $self->tdr_repo->get_manifestinfo($aippath);
+    };
+
+    # Whatever the outcome, if we update we mark the replication as done.
+    $updatedoc->{replicate}="false";
+
+    my $hasnew = $self->tdr_repo->tdrepo->get_newestaip({ keys => [$aip]});
+    if (!$hasnew) {
+        # We got an HTTP error code, so exit....
+        exit 1;
+    }
+    if (! scalar(@$hasnew)) {
+        # Maybe we missed filling in the manifest information?
+        # Otherwise increase priority to move AIP from being 'next' again.
+        if (!exists $updatedoc->{'manifest md5'}) {
+            # TODO: Incrementally update priority to 9 before going to
+            # letter....
+            $updatedoc->{priority}="a";
+            $self->log->warn("Can't find source for $aip");
+        } else {
+            # TODO:  Compare files on disk to possible existing database
+            $self->log->info("$aip already existed on server");
+        }
+        $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+        return;
+    }
+    my @repos = @{$hasnew->[0]->{value}[1]};
+
+    my $copyrepo;
+    foreach my $thisrepo (@repos) {
+	if ($thisrepo eq $self->repository) {
+	    $copyrepo=$thisrepo;
+	    last;
+	}
+    }
+    if (!$copyrepo) {
+        # This won't happen in regular operation, but might happen if replication topology changed.
+        $self->log->info("Couldn't find repo to copy $aip");
+
+        # Not a serious problem.  Update document to no longer be replicated, and go on to the next.
+        $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+        return;
+    }
+    my $aipinfo=$self->get_aipinfo($aip);
+    if (!$aipinfo) {
+        print STDERR "Couldn't get AIP information from $copyrepo\n";
+        exit 1;
+    }
+    if ($aipinfo->{'manifest md5'} && $updatedoc->{'manifest md5'}
+        && $aipinfo->{'manifest md5'} eq $updatedoc->{'manifest md5'}) {
+        $self->log->info("$aip with md5(". $updatedoc->{'manifest md5'} . ") already exists.\n");
+        $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+        return;
+    }
+
+    # Find existing, or create new, path to be used in incoming.
+    my $incomingpath;
+    my ($pool,$path,$id) = $self->tdr_repo->find_incoming_pool($contributor,$identifier);
+    if (! $pool ) {
+	my $pool=$self->tdr_repo->pool_free;
+	if (!$pool) {
+	    # This should never happen, unless something misconfigured
+	    print STDERR "Couldn't get pool with free space\n";
+	    exit 1;
+	}
+	$incomingpath=$self->tdr_repo->incoming_basepath($pool)."/$aip";
+	mkdir $incomingpath;
+    } else {
+	$incomingpath = $path."/".$id;
+    }
+
+    $self->log->info("Replicating $aip from Swift");
+
+    # Try to copy 3 times before giving up.
+    my $success=0;
+    for (my $tries=3 ; ($tries > 0) && ! $success ; $tries --) {
+	try {
+	    $self->bag_download($aip,$incomingpath);
+	    $success=1;
+	};
+    }
+
+    if ($success) {
+	$success=0;
+	try {
+	    my $bagit = new Archive::BagIt::Fast($incomingpath);
+	    my $valid = $bagit->verify_bag();
+	    # If we have the size, then set it in database
+	    if ($bagit->{stats} && $bagit->{stats}->{size}) {
+		$updatedoc->{'filesize'}=$bagit->{stats}->{size};
+	    }
+	    $success = $valid;
+	};
+	if (!$success) {
+	    my $errmessage = "Error verifying bag: $incomingpath";
+	    print STDERR $errmessage."\n";
+	    $self->log->warn($errmessage);
+	}
+    } else {
+	my $errmessage = "Error copying $aip to $incomingpath";
+        print STDERR $errmessage."\n";
+        $self->log->warn($errmessage);
+    }
+    if (!$success) {
+	# Set priority to letter, which keeps in _view/replicate , but won't be part of replication
+        $updatedoc->{priority}="a";
+        $updatedoc->{filesize}="";
+        $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+        exit;
+    }
+
+    # If the AIP already exists in the repository....
+    if (exists $updatedoc->{'manifest md5'}) {
+	$self->log->info("Removing existing $aip revision");
+
+        if(!($self->tdr_repo->aip_delete($contributor,$identifier))) {
+            my $errmessage="Failed to remove AIP: $aip";
+            print STDERR $errmessage."\n";
+            $self->log->warn($errmessage);
+
+            # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
+            $updatedoc->{priority}="a";
+            $updatedoc->{filesize}="";
+            $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+            exit;
+        }
+    }
+
+    $self->log->info("Adding $aip");
+
+    if(!($self->tdr_repo->aip_add($contributor,$identifier,$updatedoc))) {
+        my $errmessage="Failed to add AIP: $aip";
+        print STDERR $errmessage."\n";
+        $self->log->warn($errmessage);
+
+        # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
+        $updatedoc->{priority}="a";
+        $updatedoc->{filesize}="";
+        $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+        exit;
+    } else {
+	$self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
+    }
+}
+
+
+sub bag_download {
+    my ($self,$prefix,$destination) = @_;
+
+    $prefix =~ s!/*$!/!; # Add a trailing slash
+    $destination =~ s!/*$!/!; # Add a trailing slash
+
+    if (! -d $destination) {
+	die "Filesystem path '$destination' not directory\n";
+    };
+
+    # Have list of files already in destination.
+    my %destfiles;
+    find(
+	sub {if (-f && -r) { $destfiles{substr $File::Find::name,(length $destination)}=1 };},
+	$destination
+	);
+
+    # Get list of objects in Swift
+    my %containeropt = (
+	"prefix" => $prefix
+	);
+    my %bagdata;
+
+    # Need to loop possibly multiple times as Swift has a maximum of
+    # 10,000 names.
+    my $more=1;
+    while ($more) {
+	my $bagdataresp = $self->swift->container_get($self->container,
+						      \%containeropt);
+	if ($bagdataresp->code != 200) {
+	    croak "container_get(".$self->container.") for $prefix returned ". $bagdataresp->code . " - " . $bagdataresp->message. "\n";
+	};
+	$more=scalar(@{$bagdataresp->content});
+	if ($more) {
+	    $containeropt{'marker'}=$bagdataresp->content->[$more-1]->{name};
+
+	    foreach my $object (@{$bagdataresp->content}) {
+		my $file=substr $object->{name},(length $prefix);
+		$bagdata{$file}=$object;
+	    }
+	}
+    }
+
+    foreach my $bagfilename (keys %bagdata) {
+	my $destfilename=$destination.$bagfilename;
+	if(exists $destfiles{$bagfilename}) {
+	    delete $destfiles{$bagfilename};
+
+	    my $size=(stat($destfilename))[7];
+
+	    ## If size matches, check md5
+	    if ($size == $bagdata{$bagfilename}{'bytes'}) {
+		open FILE, "$destfilename";
+		my $ctx = Digest::MD5->new;
+		$ctx->addfile (*FILE);
+		my $hash = $ctx->hexdigest;
+		close (FILE);
+		if ($hash eq $bagdata{$bagfilename}{'hash'}) {
+		    # If size and MD5 match, skip to next file
+		    next;
+		}
+	    }
+	}
+	my $objectname=$prefix.$bagfilename;
+	my $object = $self->swift->object_get($self->container,$objectname);
+	if ($object->code != 200) {
+	    croak "object_get container: '".$self->container."' , object: '$objectname'  returned ". $object->code . " - " . $object->message. "\n";
+	};
+	my ($fn,$dirs,$suffix) = fileparse($destfilename);
+	make_path($dirs);
+	open(my $fh, '>:raw', $destfilename)
+	    or die "Could not open file '$destfilename' $!";
+	print $fh $object->content;
+	close $fh;
+	my $filemodified = $object->object_meta_header('File-Modified');
+	if ($filemodified) {
+	    my $dt = DateTime::Format::ISO8601->parse_datetime( $filemodified );
+	    if (! $dt) {
+		die "Couldn't parse ISO8601 date from $filemodified\n";
+	    }
+	    my $atime=time;
+	    utime $atime, $dt->epoch(), $destfilename;
+	}
+    }
+    foreach my $delfile (keys %destfiles) {
+	my $file="$destination$delfile";
+	unlink $file or die "Could not unlink $file: $!";
+    }
+}
+
+sub get_aipinfo {
+    my ($self,$aip) = @_;
+
+    my $aipinfo = $self->tdrepo->get_item_otherrepo($aip,$self->repository);
+    if (! $aipinfo) {
+        return {};
+    }
+    return $aipinfo;
 }
 
 # Options include: 'skip:i','timelimit:i','limit:i','verbose','aip:s'
