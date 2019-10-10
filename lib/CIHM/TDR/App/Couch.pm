@@ -3,8 +3,6 @@ package CIHM::TDR::App::Couch;
 use common::sense;
 use Data::Dumper;
 use MooseX::App::Command;
-use DateTime;
-use DateTime::Format::MySQL;
 use CIHM::TDR::TDRConfig;
 use CIHM::TDR::Repository;
 use CIHM::TDR::Replication;
