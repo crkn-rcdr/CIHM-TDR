@@ -177,7 +177,6 @@ sub replicate {
     }
 }
 
-
 sub replicateaip {
     my ($self,$aip,$options) = @_;
     
@@ -191,107 +190,21 @@ sub replicateaip {
     };
     
     if ($aippath) {
-	$self->log->info("Replicating $aip");
+	$self->log->info("Replicating $aip to Swift");
 	$updatedoc = $self->tdr_repo->get_manifestinfo($aippath);
 	# Reset this, cleared by above call
 	$updatedoc->{replicate}="false";
-	
-	my @aipfiles;
-	find(
-	    sub {-f && -r && push @aipfiles, $File::Find::name;},
-	    $aippath
-	    );
 
-	# To support AIP updates, check what files already exist
-	my %containeropt = (
-	    "prefix" => $aip."/"
-	    );
-	my %aipdata;
-
-	# Need to loop possibly multiple times as Swift has a maximum of
-	# 10,000 names.
-	my $more=1;
-	while ($more) {
-	    my $aipdataresp = $self->swift->container_get($self->container,
-							  \%containeropt);
-	    if ($aipdataresp->code != 200) {
-		croak "container_get(".$self->container.") for $aip returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	# Try to copy 3 times before giving up.
+	my $success=0;
+	for (my $tries=3 ; ($tries > 0) && ! $success ; $tries --) {
+	    try {
+		$self->bag_upload($aippath,$aip);
+		$success=1;
 	    };
-	    $more=scalar(@{$aipdataresp->content});
-	    if ($more) {
-		$containeropt{'marker'}=$aipdataresp->content->[$more-1]->{name};
-
-		foreach my $object (@{$aipdataresp->content}) {
-		    my $file=substr $object->{name},(length $aip)+1;
-		    $aipdata{$file}=$object;
-		}
-	    }
-	    undef $aipdataresp;
 	}
+	die "Failure while uploading $aip to $aippath\n" if (!$success);
 
-	{
-	    # Load manifest to get MD5 of data files.
-	    my $aipfile = $aippath."/manifest-md5.txt";
-	    open(my $fh, '<:raw', $aipfile)
-		or die "replicate_aip: Could not open file '$aipfile' $!\n";
-	    chomp(my @lines = <$fh>);
-	    close $fh;
-	    foreach my $line (@lines) {
-		if ($line =~ /^\s*([^\s]+)\s+([^\s]+)\s*/) {
-		    my ($md5,$file)=($1,$2);
-		    if (exists $aipdata{$file}) {
-			# Fill in md5 from manifest to compare before sending
-			$aipdata{$file}{'md5'} = $md5;
-		    }
-		}
-	    }
-
-	    # looping through filenames found on filesystem.
-	    foreach my $aipfile (@aipfiles) {
-		my $file = substr $aipfile, (length $aippath)+1;
-		my $object = $aip . '/' . $file;
-
-		# Check if file with same md5 already on Swift
-		if (! exists $aipdata{$file} ||
-		    ! exists $aipdata{$file}{'md5'} ||
-		    $aipdata{$file}{'md5'} ne  $aipdata{$file}{'hash'}
-		    ) {
-
-		    open(my $fh, '<:raw', $aipfile)
-			or die "replicate_aip: Could not open file '$aipfile' $!\n";
-
-		    my $filedate="unknown";
-		    my $mtime=(stat($fh))[9];
-		    if ($mtime) {
-			my $dt = DateTime->from_epoch(epoch => $mtime);
-			$filedate = $dt->datetime. "Z";
-		    }
-		    print "Put $object\n" if $verbose;
-
-		    my $putresp = $self->swift->object_put($self->container,$object, $fh, { 'File-Modified' => $filedate});
-		    if ($putresp->code != 201) {
-			die("object_put of $object returned ".$putresp->code . " - " . $putresp->message."\n");
-		    }
-		    close $fh;
-		} elsif ($verbose) {
-		    #print $object." already exists on Swift\n";
-		}
-		# Remove key, to allow detection of extra files in Swift
-		delete  $aipdata{$file};
-	    }
-	    if (keys %aipdata) {
-		# These files existed on Swift, but not on disk, so delete
-		# (Files with different names in different AIP revision)
-		foreach my $key (keys %aipdata) {
-		    my $delresp =
-			$self->swift->object_delete($self->container,
-						    $aipdata{$key}{'name'});
-		    if ($delresp->code != 204) {
-			$self->log->warn("object_delete of ". $aipdata{$key}{'name'}." returned ".$delresp->code . " - " . $delresp->message);
-		    }
-		}
-	    }
-	}
 	my $validate = $self->validateaip($aip,$options);
 	if ($validate->{'validate'}) {
 	    if ($updatedoc->{'manifest date'} ne $validate->{'manifest date'}) {
@@ -443,7 +356,7 @@ sub replicateaipfrom {
 
         if(!($self->tdr_repo->aip_delete($contributor,$identifier))) {
             my $errmessage="Failed to remove AIP: $aip";
-            print STDERR $errmessage."\n";
+	    print STDERR $errmessage."\n";
             $self->log->warn($errmessage);
 
             # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
@@ -560,6 +473,19 @@ sub bag_upload {
 	}
 	# Remove key, to allow detection of extra files in Swift
 	delete  $bagdata{$file};
+    }
+
+    if (keys %bagdata) {
+	# These files existed on Swift, but not on disk, so delete
+	# (Files with different names in different AIP revision)
+	foreach my $key (keys %bagdata) {
+	    my $delresp =
+		$self->swift->object_delete($self->container,
+					    $bagdata{$key}{'name'});
+	    if ($delresp->code != 204) {
+		$self->log->warn("object_delete of ". $bagdata{$key}{'name'}." returned ".$delresp->code . " - " . $delresp->message);
+	    }
+	}
     }
 }
 
