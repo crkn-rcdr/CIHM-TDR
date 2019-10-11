@@ -470,6 +470,100 @@ sub replicateaipfrom {
 }
 
 
+sub bag_upload {
+    my ($self,$source,$prefix) = @_;
+
+    $prefix =~ s!/*$!/!; # Add a trailing slash
+    $source =~ s!/*$!/!; # Add a trailing slash
+
+    # List local files
+    my @bagfiles;
+    find(
+	sub {-f && -r && push @bagfiles, $File::Find::name;},
+	$source
+	);
+
+    #print Dumper ($source,$prefix,\@bagfiles);
+
+    # To support BAG updates, check what files already exist
+    my %containeropt = (
+	"prefix" => $prefix
+	);
+    my %bagdata;
+
+    # Need to loop possibly multiple times as Swift has a maximum of
+    # 10,000 names.
+    my $more=1;
+    while ($more) {
+	my $bagdataresp = $self->swift->container_get($self->container,
+							  \%containeropt);
+	if ($bagdataresp->code != 200) {
+	    croak "container_get(".$self->container.") for $prefix returned ". $bagdataresp->code . " - " . $bagdataresp->message. "\n";
+	};
+	$more=scalar(@{$bagdataresp->content});
+	if ($more) {
+	    $containeropt{'marker'}=$bagdataresp->content->[$more-1]->{name};
+
+	    foreach my $object (@{$bagdataresp->content}) {
+		my $file=substr $object->{name},(length $prefix);
+		$bagdata{$file}=$object;
+	    }
+	}
+	undef $bagdataresp;
+    }
+
+    # Load manifest to get MD5 of data files.
+    my $bagfile = $source."manifest-md5.txt";
+    open(my $fh, '<:raw', $bagfile)
+	or die "replicate_aip: Could not open file '$bagfile' $!\n";
+    chomp(my @lines = <$fh>);
+    close $fh;
+    foreach my $line (@lines) {
+	if ($line =~ /^\s*([^\s]+)\s+([^\s]+)\s*/) {
+	    my ($md5,$file)=($1,$2);
+	    if (exists $bagdata{$file}) {
+		# Fill in md5 from manifest to compare before sending
+		$bagdata{$file}{'md5'} = $md5;
+	    }
+	}
+    }
+
+    #print Dumper (\%bagdata);
+
+
+    # looping through filenames found on filesystem.
+    foreach my $bagfile (@bagfiles) {
+	my $file = substr $bagfile, (length $source);
+	my $object = $prefix . $file;
+
+	# Check if file with same md5 already on Swift
+	if (! exists $bagdata{$file} ||
+	    ! exists $bagdata{$file}{'md5'} ||
+	    $bagdata{$file}{'md5'} ne  $bagdata{$file}{'hash'}
+	    ) {
+
+	    open(my $fh, '<:raw', $bagfile)
+		or die "bag_upload: Could not open file '$bagfile' $!\n";
+
+	    my $filedate="unknown";
+	    my $mtime=(stat($fh))[9];
+	    if ($mtime) {
+		my $dt = DateTime->from_epoch(epoch => $mtime);
+		$filedate = $dt->datetime. "Z";
+	    }
+
+	    my $putresp = $self->swift->object_put($self->container,$object, $fh, { 'File-Modified' => $filedate});
+	    if ($putresp->code != 201) {
+		die("object_put of $object returned ".$putresp->code . " - " . $putresp->message."\n");
+	    }
+	    close $fh;
+	}
+	# Remove key, to allow detection of extra files in Swift
+	delete  $bagdata{$file};
+    }
+}
+
+
 sub bag_download {
     my ($self,$prefix,$destination) = @_;
 
