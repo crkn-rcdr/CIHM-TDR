@@ -412,6 +412,7 @@ sub replicateaipfrom {
 	    # If we have the size, then set it in database
 	    if ($bagit->{stats} && $bagit->{stats}->{size}) {
 		$updatedoc->{'filesize'}=$bagit->{stats}->{size};
+		$self->log->info("verify_bag size=".$updatedoc->{'filesize'}." Valid=$valid");
 	    }
 	    # If it was valid, mark current datetime as last validation
 	    if ($valid) {
@@ -436,6 +437,9 @@ sub replicateaipfrom {
         $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
         exit;
     }
+
+    # Ensure the success, size, etc is recorded
+    $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
 
     # If the AIP already exists in the repository....
     if (exists $updatedoc->{'manifest md5'}) {
