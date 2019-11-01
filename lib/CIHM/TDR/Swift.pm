@@ -744,7 +744,7 @@ sub walk {
     if ($res->failed) {
 	die ("Walk tdrepo->get failed flag set\n". $res->response->as_string() . "\n");
     }
-    if (! keys $res->data) {
+    if (! keys %{$res->data}) {
 	die ("Walk tdrepo->get empty hash\n". $res->response->as_string() . "\n");
     }
     my $aiplist=$res->data;
