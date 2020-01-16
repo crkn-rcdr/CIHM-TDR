@@ -244,7 +244,8 @@ sub replicateaipfrom {
     my $hasnew = $self->tdr_repo->tdrepo->get_newestaip({ keys => [$aip]});
     if (!$hasnew) {
         # We got an HTTP error code, so exit....
-        exit 1;
+	$self->log->warn("Failed getting 'hasnew' for $aip");
+	return;
     }
     if (! scalar(@$hasnew)) {
         # Maybe we missed filling in the manifest information?
@@ -280,8 +281,8 @@ sub replicateaipfrom {
     }
     my $aipinfo=$self->get_aipinfo($aip);
     if (!$aipinfo) {
-        print STDERR "Couldn't get AIP information from $copyrepo\n";
-        exit 1;
+        $self->log->info("Couldn't get AIP information from $copyrepo\n");
+	return;
     }
     if ($aipinfo->{'manifest md5'} && $updatedoc->{'manifest md5'}
         && $aipinfo->{'manifest md5'} eq $updatedoc->{'manifest md5'}) {
@@ -298,7 +299,7 @@ sub replicateaipfrom {
 	if (!$pool) {
 	    # This should never happen, unless something misconfigured
 	    print STDERR "Couldn't get pool with free space\n";
-	    exit 1;
+	    return;
 	}
 	$incomingpath=$self->tdr_repo->incoming_basepath($pool)."/$aip";
 	mkdir $incomingpath;
@@ -325,7 +326,6 @@ sub replicateaipfrom {
 	    # If we have the size, then set it in database
 	    if ($bagit->{stats} && $bagit->{stats}->{size}) {
 		$updatedoc->{'filesize'}=$bagit->{stats}->{size};
-		$self->log->info("verify_bag size=".$updatedoc->{'filesize'}." Valid=$valid");
 	    }
 	    # If it was valid, mark current datetime as last validation
 	    if ($valid) {
@@ -348,7 +348,7 @@ sub replicateaipfrom {
         $updatedoc->{priority}="a";
         $updatedoc->{filesize}="";
         $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
-        exit;
+        return;
     }
 
     # Ensure the success, size, etc is recorded
@@ -367,7 +367,7 @@ sub replicateaipfrom {
             $updatedoc->{priority}="a";
             $updatedoc->{filesize}="";
             $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
-            exit;
+            return;
         }
     }
 
@@ -382,7 +382,7 @@ sub replicateaipfrom {
         $updatedoc->{priority}="a";
         $updatedoc->{filesize}="";
         $self->tdr_repo->tdrepo->update_item_repository($aip,$updatedoc);
-        exit;
+        return;
     }
 }
 
