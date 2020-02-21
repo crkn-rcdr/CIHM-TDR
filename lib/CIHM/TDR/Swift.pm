@@ -670,7 +670,8 @@ sub validateaip {
     while ($more) {
         my $aipdataresp = $self->swift->container_get($self->container, \%containeropt);
 	if ($aipdataresp->code != 200) {
-	    croak "container_get(".$self->container.") for $aip/data/ for validate_aip returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	    warn "container_get(".$self->container.") for $aip/data/ for validate_aip returned ". $aipdataresp->code . " - " . $aipdataresp->message. "\n";
+	    return {};
 	};
 	$more=scalar(@{$aipdataresp->content});
 	if ($more) {
@@ -686,7 +687,8 @@ sub validateaip {
     my $manifest=$aip."/manifest-md5.txt";
     my $aipmanifest = $self->swift->object_get($self->container,$manifest);
     if ($aipmanifest->code != 200) {
-	croak "object_get container: '".$self->container."' , object: '$manifest'  returned ". $aipmanifest->code . " - " . $aipmanifest->message. "\n";
+	warn "validate_aip container: '".$self->container."' , object: '$manifest'  returned ". $aipmanifest->code . " - " . $aipmanifest->message. "\n";
+	return {};
     };
     $return{'manifest date'}=$aipmanifest->object_meta_header('File-Modified');
     $return{'manifest md5'}=$aipmanifest->etag;
@@ -809,7 +811,8 @@ sub walk_aip {
     my $aipres = $self->swift->object_head($self->container,
 					   "$aip/manifest-md5.txt");
     if ($aipres->code != 200) {
-	die "object_head: '".$self->container."' , object: 'aip/manifest-md5.txt'  returned ". $aipres->code . " - " . $aipres->message. "\n";
+	warn "walk_aip container:: '".$self->container."' , object: '$aip/manifest-md5.txt'  returned ". $aipres->code . " - " . $aipres->message. "\n";
+	return;
     };
 
 
