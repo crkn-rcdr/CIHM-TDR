@@ -94,12 +94,12 @@ sub run {
 
     switch ($self->cmd) {
         case "copy" {
-            my $file = shift $self->extra_argv;
+            my $file = shift @{$self->extra_argv};
             if (!$file) {
                 say STDERR "Missing source for copy";
                 exit 1;
             }
-            my $tofile = shift $self->extra_argv;
+            my $tofile = shift @{$self->extra_argv};
             if (!$tofile) {
                 say STDERR "Missing destingation filename for copy";
                 exit 1;
