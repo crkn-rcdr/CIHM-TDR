@@ -44,7 +44,7 @@ sub run {
 
     my $cmd = $self->cmd;   
     if ($cmd eq "diff") {
-        my $fromrepo = shift $self->extra_argv;
+        my $fromrepo = shift @{$self->extra_argv};
 
         my $newestaips = $t_rep->tdrepo->get_newestaip({date => $self->since});
         if (!$newestaips || !scalar(@$newestaips)) {
@@ -76,7 +76,7 @@ sub run {
     } elsif ($cmd eq "replicate") {
 	$t_rep->replicate();
     } elsif ($cmd eq "test") {
-	my $aip = shift $self->extra_argv;
+	my $aip = shift @{$self->extra_argv};
 	print "$aip : \n";
 
             my $priority = 5;  # Set default priority

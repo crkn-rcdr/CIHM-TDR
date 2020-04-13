@@ -54,7 +54,7 @@ sub run {
   $| = 1;
   print "Loading AIP list from database...";
   $self->get_aiplist();
-  my $aipcount= keys $self->{aiplist};
+  my $aipcount= keys %{$self->{aiplist}};
   print " $aipcount found in DB.\n";
 
   $self->{aip_count}=0;
@@ -64,11 +64,11 @@ sub run {
       $self->walk_pool($poolname);
   }
 
-  my $aiplist= keys $self->{aiplist};
+  my $aiplist= keys %{$self->{aiplist}};
   my $nomanifest=0;
   if (! $self->quiet && ($aiplist > 0)) {
       print "There were $aiplist AIPs only found in DB.  Listing those with manifests:\n--begin--\n";
-      foreach my $aipkey (keys $self->{aiplist}) {
+      foreach my $aipkey (keys %{$self->{aiplist}}) {
 	  if (exists $self->{aiplist}->{$aipkey}->{'manifest md5'}) {
 	      print "$aipkey\n";
 	  } else {
@@ -81,7 +81,7 @@ sub run {
       }
   }
 
-  my $aipfound= keys $self->{aipfound};
+  my $aipfound= keys %{$self->{aipfound}};
   print $self->{aip_count} . " AIPs found on disk";
   if ($aipfound == $self->{aip_count}) {
       print ".\n";
@@ -245,7 +245,7 @@ sub get_aiplist {
           print STDERR ("get_aip() failed flag set\n". $res->response->as_string() . "\n");
           exit 1;
       }
-      if (! keys $res->data) {
+      if (! keys %{$res->data}) {
           print STDERR ("get_aip() empty hash\n". $res->response->as_string() . "\n");
           exit 1;
       }
