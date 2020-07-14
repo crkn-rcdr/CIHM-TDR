@@ -9,7 +9,7 @@ use Try::Tiny;
 use Log::Log4perl;
 use File::Spec;
 our %tdrconfig;
-my  $DEBUG=0;
+my $DEBUG = 0;
 
 =head1 NAME
 
@@ -40,63 +40,66 @@ and provides a global single instance of the configuration object.
 =cut
 
 sub _new_instance {
-  my $class = shift;
-  my $self = bless {}, $class;
-  Log::Log4perl->init_once("/etc/canadiana/tdr/log4perl.conf");
-  $self->{logger} = Log::Log4perl::get_logger("CIHM::TDR");
+    my $class = shift;
+    my $self = bless {}, $class;
+    Log::Log4perl->init_once("/etc/canadiana/tdr/log4perl.conf");
+    $self->{logger} = Log::Log4perl::get_logger("CIHM::TDR");
 
-  my $conf = shift || "/etc/canadiana/tdr/tdr.conf";
-  my $conf_file;
-  if(-d $conf) {
-    $conf_file = File::Spec->catpath($conf, "tdr.conf");
-  }
-  elsif (-f $conf) {
-    $conf_file=$conf;
-  }
-  else {
-    die ("invalid config path passed into TDRConfig");
-  }
-  $self->{default_config_path} = $conf_file;
-  $self->{logger}->debug("default_config_path: ".$self->{default_config_path} );
-  my $config = new Config::General(
-    -ConfigFile => $conf_file,
-  );
-  $self->{logger}->debug("default_config: ".Dumper($config->getall)) if $DEBUG;
+    my $conf = shift || "/etc/canadiana/tdr/tdr.conf";
+    my $conf_file;
+    if ( -d $conf ) {
+        $conf_file = File::Spec->catpath( $conf, "tdr.conf" );
+    }
+    elsif ( -f $conf ) {
+        $conf_file = $conf;
+    }
+    else {
+        die("invalid config path passed into TDRConfig");
+    }
+    $self->{default_config_path} = $conf_file;
+    $self->{logger}
+      ->debug( "default_config_path: " . $self->{default_config_path} );
+    my $config = new Config::General( -ConfigFile => $conf_file, );
+    $self->{logger}->debug( "default_config: " . Dumper( $config->getall ) )
+      if $DEBUG;
 
-  $self->{tdrconfig}->{$self->{default_config_path}}={$config->getall};
+    $self->{tdrconfig}->{ $self->{default_config_path} } = { $config->getall };
 
-  return $self;
+    return $self;
 }
+
 sub logger {
     my ($self) = shift;
     return $self->{logger};
 }
 
 sub get_conf {
-  my $self = shift;
-  $self->{logger}->debug("default: ".Dumper($self->{tdrconfig}->{$self->{default_config_path}})) if $DEBUG;
-  my $path  = shift || return $self->{tdrconfig}->{$self->{default_config_path}}; 
-  $self->{logger}->debug("path: ".$path );
-  if(!$self->{tdrconfig}->{$path}) {
-    my $tdrconfig = \$self->set_conf($path);
-    $self->{logger}->debug("tdrconfig: ".Dumper($tdrconfig)) if $DEBUG;
-  }
-  return $self->{tdrconfig}->{$path};
+    my $self = shift;
+    $self->{logger}->debug( "default: "
+          . Dumper( $self->{tdrconfig}->{ $self->{default_config_path} } ) )
+      if $DEBUG;
+    my $path =
+      shift || return $self->{tdrconfig}->{ $self->{default_config_path} };
+    $self->{logger}->debug( "path: " . $path );
+    if ( !$self->{tdrconfig}->{$path} ) {
+        my $tdrconfig = \$self->set_conf($path);
+        $self->{logger}->debug( "tdrconfig: " . Dumper($tdrconfig) ) if $DEBUG;
+    }
+    return $self->{tdrconfig}->{$path};
 }
 
 sub set_conf {
-  my $self = shift;
-  my $path = shift;
-  $self->{logger}->debug("TDRConfig::set_conf path: $path");
-  my $config = new Config::General(
-    -ConfigFile => $path
-  );
-  $self->{logger}->debug(Dumper($config)) if $DEBUG;
-  my $config_all={$config->getall()};
-  $self->{logger}->debug("config_all: ".Dumper($config->getall)) if $DEBUG;
-  $self->{tdrconfig}->{$path}=$config_all;
+    my $self = shift;
+    my $path = shift;
+    $self->{logger}->debug("TDRConfig::set_conf path: $path");
+    my $config = new Config::General( -ConfigFile => $path );
+    $self->{logger}->debug( Dumper($config) ) if $DEBUG;
+    my $config_all = { $config->getall() };
+    $self->{logger}->debug( "config_all: " . Dumper( $config->getall ) )
+      if $DEBUG;
+    $self->{tdrconfig}->{$path} = $config_all;
 
-  return $self->{tdrconfig}->{$path}; 
+    return $self->{tdrconfig}->{$path};
 }
 
 1;

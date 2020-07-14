@@ -12,20 +12,21 @@ use Fcntl qw(:DEFAULT :flock);
 my $lockfile = '/var/lock/tdr/tdr-swiftvalidate';
 
 # Only allow one instance to run at a time..
-sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
+sysopen( FH, $lockfile, O_WRONLY | O_CREAT )
   or die "can't open lockfile=$lockfile: $!\n";
-flock(FH, LOCK_EX | LOCK_NB)
+flock( FH, LOCK_EX | LOCK_NB )
   or exit 0;
 
 my $conf = "/etc/canadiana/tdr/tdr.conf";
 my %options;
-GetOptions ( \%options,'conf:s' => \$conf,
-	     'skip:i','timelimit:i','limit:i','verbose','aip:s');
+GetOptions(
+    \%options,
+    'conf:s' => \$conf,
+    'skip:i', 'timelimit:i', 'limit:i', 'verbose', 'aip:s'
+);
 
-my $config= {
-    configpath => $conf
-};
+my $config = { configpath => $conf };
 
-CIHM::TDR::Swift->new($config)->validate(\%options);
+CIHM::TDR::Swift->new($config)->validate( \%options );
 
 1;

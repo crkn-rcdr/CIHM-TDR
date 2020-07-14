@@ -24,73 +24,95 @@ my $skip;
 my $descending;
 my $aip;
 my $fromswift;
-GetOptions ( 'conf:s' => \$conf,'verbose' => \$verbose,
-	     'lockfile:s' => \$lockfile, 'maxprocs:i' => \$maxprocs,
-	     'skip:i' => \$skip, 'limit:i' => \$limit,
-	     'descending' => \$descending, 'aip:s' => \$aip, 'fromswift' => \$fromswift);
+GetOptions(
+    'conf:s'     => \$conf,
+    'verbose'    => \$verbose,
+    'lockfile:s' => \$lockfile,
+    'maxprocs:i' => \$maxprocs,
+    'skip:i'     => \$skip,
+    'limit:i'    => \$limit,
+    'descending' => \$descending,
+    'aip:s'      => \$aip,
+    'fromswift'  => \$fromswift
+);
 
-if ($lockfile ne 'none') {
+if ( $lockfile ne 'none' ) {
+
     # Only allow one instance to run at a time..
-    sysopen(FH, $lockfile, O_WRONLY | O_CREAT)
-	or die "can't open lockfile=$lockfile: $!\n";
-    flock(FH, LOCK_EX | LOCK_NB)
-	or exit 0;
+    sysopen( FH, $lockfile, O_WRONLY | O_CREAT )
+      or die "can't open lockfile=$lockfile: $!\n";
+    flock( FH, LOCK_EX | LOCK_NB )
+      or exit 0;
 }
 
-
-my $swift = CIHM::TDR::Swift->new({
-    configpath => $conf
-				  });
+my $swift = CIHM::TDR::Swift->new(
+    {
+        configpath => $conf
+    }
+);
 
 if ($aip) {
+
     # Simple replication of a single AIP
     my %options;
-    if($verbose) {
-	$options{'verbose'}=1;
+    if ($verbose) {
+        $options{'verbose'} = 1;
     }
     if ($fromswift) {
-	$swift->replicateaipfrom($aip,\%options);
-    } else {
-	$swift->replicateaip($aip,\%options);
+        $swift->replicateaipfrom( $aip, \%options );
     }
-} else {
+    else {
+        $swift->replicateaip( $aip, \%options );
+    }
+}
+else {
     # Using AnyEvent::Fork::Pool to replicate a few in parallel
 
     my %inprogress;
 
-    my $pool = AnyEvent::Fork
-        ->new
-        ->require ("CIHM::TDR::SwiftReplicateWorker")
-        ->AnyEvent::Fork::Pool::run
-        (
-         'CIHM::TDR::SwiftReplicateWorker::replicateaip',
-         max        => $maxprocs,
-         load       => 2,
-         on_destroy => ( my $cv_finish = AE::cv ),
-        );
+    my $pool =
+      AnyEvent::Fork->new->require("CIHM::TDR::SwiftReplicateWorker")
+      ->AnyEvent::Fork::Pool::run(
+        'CIHM::TDR::SwiftReplicateWorker::replicateaip',
+        max        => $maxprocs,
+        load       => 2,
+        on_destroy => ( my $cv_finish = AE::cv ),
+      );
 
     # Semaphore keeps us from filling the queue with too many AIPs before
     # some are processed.
-    my $sem = new Coro::Semaphore ($maxprocs*2);
+    my $sem = new Coro::Semaphore( $maxprocs * 2 );
     my $somework;
 
-    while (  ((! defined $limit) || $limit>0) &&
-	     (my $aip = getNextAIP($swift,$maxprocs,$skip, $descending, $fromswift, \%inprogress))) {
+    while (
+        ( ( !defined $limit ) || $limit > 0 )
+        && (
+            my $aip = getNextAIP(
+                $swift,      $maxprocs,  $skip,
+                $descending, $fromswift, \%inprogress
+            )
+        )
+      )
+    {
 
-	$limit-- if $limit;
+        $limit-- if $limit;
 
-        $somework=1;
-        $inprogress{$aip}=1;
+        $somework = 1;
+        $inprogress{$aip} = 1;
         $sem->down;
-        $pool->($aip,$conf,$verbose,$fromswift,sub {
-            my $aip=shift;
-	    my $error=shift;
-            $sem->up;
-            delete $inprogress{$aip};
-	    if ($error) {
-		$limit=-1;
-	    }
-                });
+        $pool->(
+            $aip, $conf, $verbose,
+            $fromswift,
+            sub {
+                my $aip   = shift;
+                my $error = shift;
+                $sem->up;
+                delete $inprogress{$aip};
+                if ($error) {
+                    $limit = -1;
+                }
+            }
+        );
     }
     undef $pool;
     if ($somework) {
@@ -103,27 +125,28 @@ if ($aip) {
 }
 
 sub getNextAIP {
-    my ($swift,$maxprocs,$skip,$descending,$fromswift, $inprogress) = @_;
+    my ( $swift, $maxprocs, $skip, $descending, $fromswift, $inprogress ) = @_;
 
     # Ensure there is enough to skip all those in progress
-    my $opts = { limit => ($maxprocs*2+2)};
+    my $opts = { limit => ( $maxprocs * 2 + 2 ) };
     if ($skip) {
-	$opts->{skip}=$skip;
+        $opts->{skip} = $skip;
     }
     if ($descending) {
-	$opts->{descending}=1;
+        $opts->{descending} = 1;
     }
 
     my @replicateaips;
     if ($fromswift) {
-	@replicateaips=$swift->tdr_repo->tdrepo->get_replicate($opts);
-    } else {
-	@replicateaips=$swift->tdrepo->get_replicate($opts);
+        @replicateaips = $swift->tdr_repo->tdrepo->get_replicate($opts);
+    }
+    else {
+        @replicateaips = $swift->tdrepo->get_replicate($opts);
     }
     foreach my $aip (@replicateaips) {
-	if (! exists $inprogress->{$aip}) {
-	    return $aip;
-	}
+        if ( !exists $inprogress->{$aip} ) {
+            return $aip;
+        }
     }
     return;
 }

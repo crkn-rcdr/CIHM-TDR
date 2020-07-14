@@ -10,7 +10,6 @@ use Moo;
 with 'Role::REST::Client';
 use Types::Standard qw(HashRef Str Int Enum HasMethods);
 
-
 =head1 NAME
 
 CIHM::TDR::REST::wipmeta - Subclass of Role::REST::Client used to
@@ -31,10 +30,10 @@ sub BUILD {
     my $self = shift;
     my $args = shift;
 
-    $self->{LocalTZ} = DateTime::TimeZone->new( name => 'local' );
-    $self->{conf} = $args->{conf}; 
+    $self->{LocalTZ}  = DateTime::TimeZone->new( name => 'local' );
+    $self->{conf}     = $args->{conf};
     $self->{database} = $args->{database};
-    $self->set_persistent_header('Accept' => 'application/json');
+    $self->set_persistent_header( 'Accept' => 'application/json' );
 }
 
 # Simple accessors for now -- Do I want to Moo?
@@ -61,40 +60,42 @@ sub database {
 
 # backward compatable which returns null or the string in the {return} key.
 sub update_basic {
-  my ($self, $uid, $updatedoc) = @_;
+    my ( $self, $uid, $updatedoc ) = @_;
 
-  my $r = $self->update_basic_full($uid,$updatedoc);
-  if (ref($r) eq "HASH") {
-      return $r->{return};
-  }
+    my $r = $self->update_basic_full( $uid, $updatedoc );
+    if ( ref($r) eq "HASH" ) {
+        return $r->{return};
+    }
 }
 
 # Returns the full return object
 sub update_basic_full {
-  my ($self, $uid, $updatedoc) = @_;
-  my ($res, $code, $data);
+    my ( $self, $uid, $updatedoc ) = @_;
+    my ( $res, $code, $data );
 
-  # This encoding makes $updatedoc variables available as form data
-  $self->type("application/x-www-form-urlencoded");
-  $res = $self->post("/".$self->{database}."/_design/tdr/_update/basic/".$uid, $updatedoc, {deserializer => 'application/json'});
+    # This encoding makes $updatedoc variables available as form data
+    $self->type("application/x-www-form-urlencoded");
+    $res = $self->post(
+        "/" . $self->{database} . "/_design/tdr/_update/basic/" . $uid,
+        $updatedoc, { deserializer => 'application/json' } );
 
-  if ($res->code != 201 && $res->code != 200) {
-      warn "_update/basic/$uid POST return code: " . $res->code . "\n";
-  }
-  return $res->data;
+    if ( $res->code != 201 && $res->code != 200 ) {
+        warn "_update/basic/$uid POST return code: " . $res->code . "\n";
+    }
+    return $res->data;
 }
 
-
 sub get_aip {
-    my ($self, $uid) = @_;
+    my ( $self, $uid ) = @_;
 
     $self->type("application/json");
-    my $res = $self->get("/".$self->{database}."/$uid",{}, {deserializer => 'application/json'});
-    if ($res->code == 200) {
+    my $res = $self->get( "/" . $self->{database} . "/$uid",
+        {}, { deserializer => 'application/json' } );
+    if ( $res->code == 200 ) {
         return $res->data;
     }
     else {
-        warn "get_aip return code: ".$res->code."\n"; 
+        warn "get_aip return code: " . $res->code . "\n";
         return;
     }
 }

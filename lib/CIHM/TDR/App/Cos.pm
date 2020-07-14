@@ -35,41 +35,41 @@ tdr cos copy oocihm.8_04385_37/manifest-md5.txt - | sed -e 's/[^ ]*[ ]*//'
 =cut
 
 parameter 'cmd' => (
-  is => 'rw',
-  isa => 'Str',
-  required => 1,
-  documentation => q[Sub-command is one of: info, copy, printjwt],
+    is            => 'rw',
+    isa           => 'Str',
+    required      => 1,
+    documentation => q[Sub-command is one of: info, copy, printjwt],
 );
 
 option 'server' => (
-    is => 'rw',
-    isa => 'Str',
+    is            => 'rw',
+    isa           => 'Str',
     documentation => q[Content server to communicate with],
 );
 
 option 'key' => (
-    is => 'rw',
-    isa => 'Str',
+    is            => 'rw',
+    isa           => 'Str',
     documentation => q[Key ID to use with Content server],
 );
 
 option 'password' => (
-    is => 'rw',
-    isa => 'Str',
+    is            => 'rw',
+    isa           => 'Str',
     documentation => q[Password to use with Content server],
 );
 
 option 'algorithm' => (
-    is => 'rw',
-    isa => 'Str',
-    default => 'HS256',
+    is            => 'rw',
+    isa           => 'Str',
+    default       => 'HS256',
     documentation => q[Algorithm used for signing the JWT],
 );
 
 option 'payload' => (
-    is => 'rw',
-    isa => 'Str',
-    default => '{"uids":[".*"]}',
+    is            => 'rw',
+    isa           => 'Str',
+    default       => '{"uids":[".*"]}',
     documentation => q[JWT payload],
 );
 
@@ -79,59 +79,65 @@ sub run {
     my ($self) = @_;
 
     my %cosargs = (
-        conf => $self->conf,
-        c7a_id => $self->key,
-        jwt_secret => $self->password,
+        conf          => $self->conf,
+        c7a_id        => $self->key,
+        jwt_secret    => $self->password,
         jwt_algorithm => $self->algorithm,
-        jwt_payload => $self->payload
-        );
+        jwt_payload   => $self->payload
+    );
+
     # Only provide this argument if it exists...
-    if ($self->server) {
-        $cosargs{server}=$self->server;
+    if ( $self->server ) {
+        $cosargs{server} = $self->server;
     }
-    my $COS_REST = new CIHM::TDR::REST::ContentServer (\%cosargs);
+    my $COS_REST = new CIHM::TDR::REST::ContentServer( \%cosargs );
 
-
-    switch ($self->cmd) {
+    switch ( $self->cmd ) {
         case "copy" {
-            my $file = shift @{$self->extra_argv};
-            if (!$file) {
+            my $file = shift @{ $self->extra_argv };
+            if ( !$file ) {
                 say STDERR "Missing source for copy";
                 exit 1;
             }
-            my $tofile = shift @{$self->extra_argv};
-            if (!$tofile) {
+            my $tofile = shift @{ $self->extra_argv };
+            if ( !$tofile ) {
                 say STDERR "Missing destingation filename for copy";
                 exit 1;
             }
             my $r = $COS_REST->get("/$file");
-            if ($r->code == 200) {
+            if ( $r->code == 200 ) {
                 my $fh;
-                if ($tofile eq "-") {
-                    open ($fh,">-");
-                } else {
-                    open($fh, '>', $tofile)
-                        or die "cannot open $tofile : $!";
+                if ( $tofile eq "-" ) {
+                    open( $fh, ">-" );
+                }
+                else {
+                    open( $fh, '>', $tofile )
+                      or die "cannot open $tofile : $!";
                 }
                 print $fh $r->response->content;
                 close;
-            } elsif ($r->code == 599) {
+            }
+            elsif ( $r->code == 599 ) {
                 say $r->response->content;
-            } else {
+            }
+            else {
                 say "Received return code: " . $r->code;
-#                say "Reponse: " . Dumper ($r->response);
+
+                #                say "Reponse: " . Dumper ($r->response);
             }
         }
         case "printjwt" {
             use Crypt::JWT qw(encode_jwt);
 
-            my $clientattrs=  $COS_REST->get_clientattrs;
+            my $clientattrs = $COS_REST->get_clientattrs;
 
-            my $jws_token = encode_jwt(payload=>$clientattrs->{jwt_payload}, 
-                                       alg=>$clientattrs->{jwt_algorithm},
-                                       key=>$clientattrs->{jwt_secret});
+            my $jws_token = encode_jwt(
+                payload => $clientattrs->{jwt_payload},
+                alg     => $clientattrs->{jwt_algorithm},
+                key     => $clientattrs->{jwt_secret}
+            );
 
-            say "Payload=".$clientattrs->{jwt_payload};
+            say "Payload=" . $clientattrs->{jwt_payload};
             say "Token=$jws_token";
         }
     }

@@ -11,13 +11,15 @@ use Fcntl qw(:DEFAULT :flock);
 my $lockfile = '/var/lock/tdr/tdr-replicate';
 
 # Only allow one instance to run at a time..
-sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
+sysopen( FH, $lockfile, O_WRONLY | O_CREAT )
   or die "can't open lockfile=$lockfile: $!\n";
-flock(FH, LOCK_EX | LOCK_NB)
+flock( FH, LOCK_EX | LOCK_NB )
   or exit 0;
 
-CIHM::TDR::Replication->new({ 
-    configpath => "/etc/canadiana/tdr/tdr.conf"
-                            })->replicate;
+CIHM::TDR::Replication->new(
+    {
+        configpath => "/etc/canadiana/tdr/tdr.conf"
+    }
+)->replicate;
 
 1;

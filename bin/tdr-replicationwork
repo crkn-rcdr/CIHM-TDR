@@ -13,29 +13,27 @@ use Fcntl qw(:DEFAULT :flock);
 my $lockfile = '/var/lock/tdr/tdr-replicationwork';
 
 # Only allow one instance to run at a time..
-sysopen(FH, $lockfile, O_WRONLY | O_CREAT) 
+sysopen( FH, $lockfile, O_WRONLY | O_CREAT )
   or die "can't open lockfile=$lockfile: $!\n";
-flock(FH, LOCK_EX | LOCK_NB)
+flock( FH, LOCK_EX | LOCK_NB )
   or exit 0;
 
 my $conf = "/etc/canadiana/tdr/tdr.conf";
 my $localdocument;
-my $since="48hours";
+my $since = "48hours";
 
-GetOptions (
-    'conf:s' => \$conf,
+GetOptions(
+    'conf:s'          => \$conf,
     'localdocument:s' => \$localdocument,
-    'since:s' => \$since
-    );
+    'since:s'         => \$since
+);
 
-my $config= {
-    configpath => $conf
-};
-if ($since ne 'never') {
-    $config->{since}=$since
+my $config = { configpath => $conf };
+if ( $since ne 'never' ) {
+    $config->{since} = $since;
 }
 if ($localdocument) {
-    $config->{localdocument}=$localdocument;
+    $config->{localdocument} = $localdocument;
 }
 
 CIHM::TDR::Replication->new($config)->replicationwork;

@@ -7,7 +7,7 @@ use Test::More;
 plan tests => 1;
 
 BEGIN {
-    use_ok( 'CIHM::TDR' ) || print "Bail out!\n";
+    use_ok('CIHM::TDR') || print "Bail out!\n";
 }
 
-diag( "Testing CIHM::TDR $CIHM::TDR::VERSION, Perl $], $^X" );
+diag("Testing CIHM::TDR $CIHM::TDR::VERSION, Perl $], $^X");
