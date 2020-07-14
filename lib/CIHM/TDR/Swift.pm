@@ -733,13 +733,19 @@ sub validateaip {
 
     my $verbose = exists $options->{'verbose'};
 
+    my %passlist = map { $_ => 1 } (
+        "bag-info.txt",       "bagit.txt",
+        "manifest-md5.txt",   "tagmanifest-md5.txt",
+        "manifest-crc32.txt", "tagmanifest-crc32.txt"
+    );
+
     # Assume validated unless problem found
     my %return = (
         "validate" => 1,
         "filesize" => 0
     );
 
-    my %containeropt = ( "prefix" => $aip . "/data/" );
+    my %containeropt = ( "prefix" => $aip . "/" );
     my %aipdata;
 
     # Need to loop possibly multiple times as Swift has a maximum of
@@ -802,14 +808,50 @@ sub validateaip {
             }
         }
     }
-    if ( scalar(@lines) != scalar( keys %aipdata ) ) {
-        $return{validate} = 0;
-        if ($verbose) {
-            foreach my $key ( keys %aipdata ) {
-                if ( !exists $aipdata{$key}{'checked'} ) {
-                    print "File '$key' is extra in Swift\n";
+    $manifest = $aip . "/tagmanifest-md5.txt";
+    $aipmanifest = $self->swift->object_get( $self->container, $manifest );
+    if ( $aipmanifest->code == 200 ) {
+
+        $return{'tagmanifest date'} =
+          $aipmanifest->object_meta_header('File-Modified');
+        $return{'tagmanifest md5'} = $aipmanifest->etag;
+        my @lines = split /\n/, $aipmanifest->content;
+        foreach my $line (@lines) {
+            if ( $line =~ /^\s*([^\s]+)\s+([^\s]+)\s*/ ) {
+                my ( $md5, $file ) = ( $1, $2 );
+                if ( exists $aipdata{$file} ) {
+                    if ( $aipdata{$file}{'hash'} ne $md5 ) {
+                        print "MD5 mismatch: "
+                          . Dumper( $file, $md5, $aipdata{$file} )
+                          if $verbose;
+                        $return{validate} = 0;
+                    }
+                    $aipdata{$file}{'checked'} = 1;
+                }
+                else {
+                    print "File '$file' missing from Swift\n"
+                      if $verbose;
+                    $return{validate} = 0;
                 }
             }
+
+        }
+    }
+    elsif ( $aipmanifest->code != 404 )
+    {    # Not found is valid for older bags -- for now...
+
+        warn "validate_aip container: '"
+          . $self->container
+          . "' , object: '$manifest'  returned "
+          . $aipmanifest->code . " - "
+          . $aipmanifest->message . "\n";
+        return {};
+    }
+
+    foreach my $key ( keys %aipdata ) {
+        if ( !exists $aipdata{$key}{'checked'} && !$passlist{$key} ) {
+            $return{validate} = 0;
+            print "File '$key' is extra in Swift\n" if ($verbose);
         }
     }
 
