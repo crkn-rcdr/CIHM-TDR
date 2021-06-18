@@ -8,6 +8,7 @@ use Try::Tiny;
 use CIHM::TDR::Repository;
 use CIHM::TDR::ContentServer;
 use Archive::BagIt::Fast;
+use Archive::BagIt;
 
 extends qw(CIHM::TDR::App);
 
