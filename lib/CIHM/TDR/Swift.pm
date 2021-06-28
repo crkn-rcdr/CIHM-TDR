@@ -820,6 +820,7 @@ sub validateaip {
             if ( $line =~ /^\s*([^\s]+)\s+([^\s]+)\s*/ ) {
                 my ( $md5, $file ) = ( $1, $2 );
                 if ( exists $aipdata{$file} ) {
+                    $return{filesize} += $aipdata{$file}{'bytes'};
                     if ( $aipdata{$file}{'hash'} ne $md5 ) {
                         print "MD5 mismatch: "
                           . Dumper( $file, $md5, $aipdata{$file} )
