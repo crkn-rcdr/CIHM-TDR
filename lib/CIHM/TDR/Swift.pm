@@ -357,9 +357,7 @@ sub replicateaipfrom {
             $success = 1;
         }
         catch {
-            my $errmessage = "bag_download($aip) error: $_";
-            print STDERR $errmessage . "\n";
-            $self->log->warn($errmessage);
+            $self->warn("bag_download($aip) error: $_");
         };
     }
 
@@ -381,21 +379,17 @@ sub replicateaipfrom {
             $success = $valid;
         };
         if ( !$success ) {
-            my $errmessage = "Error verifying bag: $incomingpath";
-            print STDERR $errmessage . "\n";
-            $self->log->warn($errmessage);
+            $self->warn("Error verifying bag: $incomingpath");
         }
     }
     else {
-        my $errmessage = "Error copying $aip to $incomingpath";
-        print STDERR $errmessage . "\n";
-        $self->log->warn($errmessage);
+        $self->warn("Error copying $aip to $incomingpath");
     }
     if ( !$success ) {
 
 # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
-        $updatedoc->{priority} = "a";
-        $updatedoc->{filesize} = "";
+        $updatedoc->{priority}   = "a";
+        $updatedoc->{nofilesize} = JSON::true;
         $self->tdr_repo->tdrepo->update_item_repository( $aip, $updatedoc );
         return;
     }
@@ -408,13 +402,11 @@ sub replicateaipfrom {
         $self->log->info("Removing existing $aip revision");
 
         if ( !( $self->tdr_repo->aip_delete( $contributor, $identifier ) ) ) {
-            my $errmessage = "Failed to remove AIP: $aip";
-            print STDERR $errmessage . "\n";
-            $self->log->warn($errmessage);
+            $self->warn("Failed to remove AIP: $aip");
 
 # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
-            $updatedoc->{priority} = "a";
-            $updatedoc->{filesize} = "";
+            $updatedoc->{priority}   = "a";
+            $updatedoc->{nofilesize} = JSON::true;
             $self->tdr_repo->tdrepo->update_item_repository( $aip, $updatedoc );
             return;
         }
@@ -425,13 +417,11 @@ sub replicateaipfrom {
     if (
         !( $self->tdr_repo->aip_add( $contributor, $identifier, $updatedoc ) ) )
     {
-        my $errmessage = "Failed to add AIP: $aip";
-        print STDERR $errmessage . "\n";
-        $self->log->warn($errmessage);
+        $self->warn("Failed to add AIP: $aip");
 
 # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
-        $updatedoc->{priority} = "a";
-        $updatedoc->{filesize} = "";
+        $updatedoc->{priority}   = "a";
+        $updatedoc->{nofilesize} = JSON::true;
         $self->tdr_repo->tdrepo->update_item_repository( $aip, $updatedoc );
         return;
     }
@@ -1042,4 +1032,11 @@ sub walk_aip {
     }
 }
 
+sub warn {
+    my ( $self, errmessage ) = @_;
+
+    $errmessage =~ s/ at \w+ line \d+\.$/\n/;
+    print STDERR $errmessage . "\n";
+    $self->log->warn($errmessage);
+}
 1;
