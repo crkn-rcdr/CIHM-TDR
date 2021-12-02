@@ -355,6 +355,11 @@ sub replicateaipfrom {
         try {
             $self->bag_download( $aip, $incomingpath );
             $success = 1;
+        }
+        catch {
+            my $errmessage = "bag_download($aip) error: $_";
+            print STDERR $errmessage . "\n";
+            $self->log->warn($errmessage);
         };
     }
 
