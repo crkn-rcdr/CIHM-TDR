@@ -1033,10 +1033,11 @@ sub walk_aip {
 }
 
 sub warn {
-    my ( $self, errmessage ) = @_;
+    my ( $self, $errmessage ) = @_;
 
     $errmessage =~ s/ at \w+ line \d+\.$/\n/;
     print STDERR $errmessage . "\n";
     $self->log->warn($errmessage);
 }
+
 1;
