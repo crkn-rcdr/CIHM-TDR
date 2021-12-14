@@ -617,20 +617,20 @@ sub bag_download {
             }
         }
         my $objectname = $prefix . $bagfilename;
-        my $object = $self->swift->object_get( $self->container, $objectname );
-        if ( $object->code != 200 ) {
-            croak "object_get container: '"
-              . $self->container
-              . "' , object: '$objectname'  returned "
-              . $object->code . " - "
-              . $object->message . "\n";
-        }
         my ( $fn, $dirs, $suffix ) = fileparse($destfilename);
         make_path($dirs);
         open( my $fh, '>:raw', $destfilename )
           or die "Could not open file '$destfilename' $!";
-        print $fh $object->content;
+        my $object = $self->swift->object_get( $self->container, $objectname,
+            { write_file => $fh } );
         close $fh;
+        if ( $object->code != 200 ) {
+            croak "object_get container: '"
+              . $self->container
+              . "' , object: '$objectname' destfilename: '$destfilename'  returned "
+              . $object->code . " - "
+              . $object->message . "\n";
+        }
         my $filemodified = $object->object_meta_header('File-Modified');
         if ($filemodified) {
             my $dt = DateTime::Format::ISO8601->parse_datetime($filemodified);
