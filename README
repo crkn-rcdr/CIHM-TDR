@@ -1,5 +1,10 @@
 CIHM-TDR
 
+Note:  The plan is for all of this to go away as soon as possible,
+and be replaced by tools managing Archivematica repositories on Swift.
+See: https://github.com/crkn-rcdr/Digital-Preservation
+
+
 This is a module used by Canadiana to handle much of the lower-level
 manipulation of the repository.
 

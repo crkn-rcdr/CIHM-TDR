@@ -355,6 +355,9 @@ sub replicateaipfrom {
         try {
             $self->bag_download( $aip, $incomingpath );
             $success = 1;
+        }
+        catch {
+            $self->warn("bag_download($aip) error: $_");
         };
     }
 
@@ -376,21 +379,17 @@ sub replicateaipfrom {
             $success = $valid;
         };
         if ( !$success ) {
-            my $errmessage = "Error verifying bag: $incomingpath";
-            print STDERR $errmessage . "\n";
-            $self->log->warn($errmessage);
+            $self->warn("Error verifying bag: $incomingpath");
         }
     }
     else {
-        my $errmessage = "Error copying $aip to $incomingpath";
-        print STDERR $errmessage . "\n";
-        $self->log->warn($errmessage);
+        $self->warn("Error copying $aip to $incomingpath");
     }
     if ( !$success ) {
 
 # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
-        $updatedoc->{priority} = "a";
-        $updatedoc->{filesize} = "";
+        $updatedoc->{priority}   = "a";
+        $updatedoc->{nofilesize} = JSON::true;
         $self->tdr_repo->tdrepo->update_item_repository( $aip, $updatedoc );
         return;
     }
@@ -403,13 +402,11 @@ sub replicateaipfrom {
         $self->log->info("Removing existing $aip revision");
 
         if ( !( $self->tdr_repo->aip_delete( $contributor, $identifier ) ) ) {
-            my $errmessage = "Failed to remove AIP: $aip";
-            print STDERR $errmessage . "\n";
-            $self->log->warn($errmessage);
+            $self->warn("Failed to remove AIP: $aip");
 
 # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
-            $updatedoc->{priority} = "a";
-            $updatedoc->{filesize} = "";
+            $updatedoc->{priority}   = "a";
+            $updatedoc->{nofilesize} = JSON::true;
             $self->tdr_repo->tdrepo->update_item_repository( $aip, $updatedoc );
             return;
         }
@@ -420,13 +417,11 @@ sub replicateaipfrom {
     if (
         !( $self->tdr_repo->aip_add( $contributor, $identifier, $updatedoc ) ) )
     {
-        my $errmessage = "Failed to add AIP: $aip";
-        print STDERR $errmessage . "\n";
-        $self->log->warn($errmessage);
+        $self->warn("Failed to add AIP: $aip");
 
 # Set priority to letter, which keeps in _view/replicate , but won't be part of replication
-        $updatedoc->{priority} = "a";
-        $updatedoc->{filesize} = "";
+        $updatedoc->{priority}   = "a";
+        $updatedoc->{nofilesize} = JSON::true;
         $self->tdr_repo->tdrepo->update_item_repository( $aip, $updatedoc );
         return;
     }
@@ -622,20 +617,20 @@ sub bag_download {
             }
         }
         my $objectname = $prefix . $bagfilename;
-        my $object = $self->swift->object_get( $self->container, $objectname );
-        if ( $object->code != 200 ) {
-            croak "object_get container: '"
-              . $self->container
-              . "' , object: '$objectname'  returned "
-              . $object->code . " - "
-              . $object->message . "\n";
-        }
         my ( $fn, $dirs, $suffix ) = fileparse($destfilename);
         make_path($dirs);
         open( my $fh, '>:raw', $destfilename )
           or die "Could not open file '$destfilename' $!";
-        print $fh $object->content;
+        my $object = $self->swift->object_get( $self->container, $objectname,
+            { write_file => $fh } );
         close $fh;
+        if ( $object->code != 200 ) {
+            croak "object_get container: '"
+              . $self->container
+              . "' , object: '$objectname' destfilename: '$destfilename'  returned "
+              . $object->code . " - "
+              . $object->message . "\n";
+        }
         my $filemodified = $object->object_meta_header('File-Modified');
         if ($filemodified) {
             my $dt = DateTime::Format::ISO8601->parse_datetime($filemodified);
@@ -1035,6 +1030,14 @@ sub walk_aip {
         }
         $self->tdr_repo->update_item_repository( $aip, $updatedoc );
     }
+}
+
+sub warn {
+    my ( $self, $errmessage ) = @_;
+
+    $errmessage =~ s/ at \w+ line \d+\.$/\n/;
+    print STDERR $errmessage . "\n";
+    $self->log->warn($errmessage);
 }
 
 1;

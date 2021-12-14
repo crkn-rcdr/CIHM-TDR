@@ -24,17 +24,25 @@ my $skip;
 my $descending;
 my $aip;
 my $fromswift;
+my $timelimit;
+
 GetOptions(
-    'conf:s'     => \$conf,
-    'verbose'    => \$verbose,
-    'lockfile:s' => \$lockfile,
-    'maxprocs:i' => \$maxprocs,
-    'skip:i'     => \$skip,
-    'limit:i'    => \$limit,
-    'descending' => \$descending,
-    'aip:s'      => \$aip,
-    'fromswift'  => \$fromswift
+    'conf:s'      => \$conf,
+    'verbose'     => \$verbose,
+    'lockfile:s'  => \$lockfile,
+    'maxprocs:i'  => \$maxprocs,
+    'skip:i'      => \$skip,
+    'limit:i'     => \$limit,
+    'descending'  => \$descending,
+    'aip:s'       => \$aip,
+    'fromswift'   => \$fromswift,
+    'timelimit:i' => \$timelimit
 );
+
+my $endtime;
+if ($timelimit) {
+    $endtime = time() + $timelimit;
+}
 
 if ( $lockfile ne 'none' ) {
 
@@ -85,7 +93,8 @@ else {
     my $somework;
 
     while (
-        ( ( !defined $limit ) || $limit > 0 )
+           ( ( !defined $limit ) || $limit > 0 )
+        && ( !defined $endtime || time() < $endtime )
         && (
             my $aip = getNextAIP(
                 $swift,      $maxprocs,  $skip,
