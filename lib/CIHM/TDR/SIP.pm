@@ -225,7 +225,7 @@ sub validate {
                 my $magic_type =
                   qx(identify -format "%m" $tempdir/$pdffile 2> /dev/null);
                 die
-"Distribution PDF page $pdffile type doesn't match extension\n"
+"Distribution PDF page $pdffile type doesn't match extension  (Magic=$magic_type , Suffix=$suffix_type)\n"
                   unless $magic_type =~ /$suffix_type/;
             }
         }
@@ -270,7 +270,7 @@ sub validate {
         else {
             # Using ImageMagic's identify to verify file type
             my $magic_type = qx(identify -format "%m" $file 2> /dev/null);
-            die "$file type doesn't match extension\n"
+            die "$file type doesn't match extension (Magic=$magic_type , Suffix=$suffix_type)\n"
               unless $magic_type =~ /$suffix_type/;
 
         }
