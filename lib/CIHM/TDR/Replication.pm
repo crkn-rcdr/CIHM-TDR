@@ -62,6 +62,16 @@ sub config {
     return $self->{config};
 }
 
+sub skip {
+    my $self = shift;
+    return $self->{args}->{skip};
+}
+
+sub descending {
+    my $self = shift;
+    return $self->{args}->{descending};
+}
+
 sub incoming {
     my $self = shift;
     return $self->{incoming};
@@ -135,8 +145,18 @@ sub replicate {
 
     # One by one, sorted by priority, get the AIPs we should replicate
     my @replicateaips;
-    while ( ( @replicateaips = $self->tdrepo->get_replicate( { limit => 1 } ) )
-        && scalar(@replicateaips) )
+    while (
+        (
+            @replicateaips = $self->tdrepo->get_replicate(
+                {
+                    limit      => 1,
+                    skip       => $self->skip,
+                    descending => $self->descending
+                }
+            )
+        )
+        && scalar(@replicateaips)
+      )
     {
         $self->replicateaip( pop @replicateaips );
     }

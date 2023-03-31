@@ -347,13 +347,10 @@ sub get_replicate {
     if ( $params->{skip} ) {
         $txtparams .= "&skip=" . $params->{skip};
     }
-    $res = $self->get(
-        "/"
-          . $self->{database}
-          . "/_design/tdr/_view/replicate?reduce=false$txtparams",
-        {},
-        { deserializer => 'application/json' }
-    );
+    my $url = "/"
+      . $self->{database}
+      . "/_design/tdr/_view/replicate?reduce=false$txtparams";
+    $res = $self->get( $url, {}, { deserializer => 'application/json' } );
     if ( $res->code == 200 ) {
         my @aips = ();
         foreach my $aip ( @{ $res->data->{rows} } ) {
@@ -362,7 +359,7 @@ sub get_replicate {
         return (@aips);
     }
     else {
-        warn "tdr/_view/replicate GET return code: " . $res->code . "\n";
+        warn "$url GET return code: " . $res->code . "\n";
         return;
     }
 }
