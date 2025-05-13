@@ -20,7 +20,7 @@ flock( FH, LOCK_EX | LOCK_NB )
 
 my $conf = "/etc/canadiana/tdr/tdr.conf";
 my $localdocument;
-my $since = "48hours";
+my $since; # Removing default: = "48hours"; because it was causing pairity issues
 
 GetOptions(
     'conf:s'          => \$conf,
