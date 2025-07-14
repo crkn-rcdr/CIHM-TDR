@@ -116,7 +116,7 @@ sub replicationwork {
 "No replication repositories (Repositories which have listed a priority)....\n";
         exit 1;
     }
-    $self->log->info("Looking for replication work");
+    $self->log->info("Looking for replication work...");
     $self->set_replicationwork(
         {
             date          => $self->since,
@@ -412,10 +412,12 @@ sub set_replicationwork {
     my ( $self, $params ) = @_;
     my ( $res, $code );
 
+    $self->log->warn("getting newestaips");
     my $newestaips = $self->tdrepo->get_newestaip($params);
+    $self->log->warn("finished getting newestaips");
     if ( !$newestaips || !scalar(@$newestaips) ) {
 
-        # print STDERR "Nothing new....";
+        $self->log->warn("Nothing new....");
         return;
     }
 
@@ -424,6 +426,8 @@ sub set_replicationwork {
     my @myrepos = @{ $params->{repos} };
     foreach my $thisaip (@$newestaips) {
         my $aip   = $thisaip->{key};
+        $self->log->info("aip");
+        $self->log->info( $thisaip->{key});
         my @repos = @{ $thisaip->{value}[1] };
 
         # Loop though repos we would be willing to sync from
